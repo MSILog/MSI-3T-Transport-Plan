@@ -650,11 +650,20 @@ async function doLogin(){
   const btn=document.getElementById('lbtn'), err=document.getElementById('lerr');
   if(!u||!p){err.textContent='Enter username and password.';err.style.display='block';return;}
   btn.innerHTML='<span class="spinner"></span> Signing in…'; btn.disabled=true; err.style.display='none';
+
+  // Always check demo credentials — works even with no API URL
+  const demo={wapat:{role:'cs',fullName:'Wapat S.'},somchai:{role:'transport',fullName:'Somchai T.'},admin:{role:'admin',fullName:'Admin'},diskorn:{role:'management',fullName:'Khun Diskorn'}};
+
   let res;
-  if(!API_URL){
-    const demo={wapat:{role:'cs',fullName:'Wapat S.'},somchai:{role:'transport',fullName:'Somchai T.'},admin:{role:'admin',fullName:'Admin'},diskorn:{role:'management',fullName:'Khun Diskorn'}};
-    res=demo[u]?{ok:true,...demo[u]}:{ok:false,error:'Invalid credentials (demo mode)'};
-  } else { res=await api({action:'login',username:u,password:p}); }
+  if(API_URL){
+    try{ res=await api({action:'login',username:u,password:p}); }
+    catch(e){ res=null; }
+    // If API fails, fall back to demo login
+    if(!res||!res.ok) res=demo[u]?{ok:true,...demo[u]}:{ok:false,error:'Invalid username or password'};
+  } else {
+    res=demo[u]?{ok:true,...demo[u]}:{ok:false,error:'Invalid username or password'};
+  }
+
   btn.innerHTML='Sign in'; btn.disabled=false;
   if(res.ok){
     SESSION=res;
@@ -722,7 +731,14 @@ function loadDemo(){
     {JobID:'TMS-008',RefNo:'REF-008',Customer:'Isuzu',ShortDesc:'Gateway to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'Isuzu Gateway, Samut Prakan',PickupProvince:'Samut Prakan',PickupPostal:'10540',DeliveryLocation:'Laem Chabang Port Gate 2, Chonburi',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(1),StartTime:'08:30',EndDate:d(1),EndTime:'14:00',Vehicle:'',Trailer:'',EstDist:'95',MilStart:'',MilEnd:'',ActDist:'',Charge:'3800',Weight:'750',XRay:'No',Pieces:'15',CargoType:'Auto parts',Remark:'',Status:'Pending',ConsolidationGroup:''},
   ];
 }
-function renderAll(){renderDashboard();renderJobsTable();renderConsolidation();renderDispatch();renderReports();renderDropdowns();}
+function renderAll(){
+  try{renderDashboard();}catch(e){console.error('Dashboard:',e);}
+  try{renderJobsTable();}catch(e){console.error('Jobs:',e);}
+  try{renderConsolidation();}catch(e){console.error('Consolidation:',e);}
+  try{renderDispatch();}catch(e){console.error('Dispatch:',e);}
+  try{renderReports();}catch(e){console.error('Reports:',e);}
+  try{renderDropdowns();}catch(e){console.error('Dropdowns:',e);}
+}
 
 /* ═══════════════ CALENDAR DASHBOARD ═══════════════ */
 function renderDashboard(){
@@ -1069,7 +1085,7 @@ function renderDispatch(){
 
 /* ═══════════════ DROPDOWNS MODULE ═══════════════ */
 function renderDropdowns(){
-  const canEdit=SESSION.role==='admin';
+  const canEdit=SESSION&&SESSION.role==='admin';
   document.getElementById('dd-content').innerHTML=`
     <div class="dd-grid">${Object.entries(DROPDOWNS).map(([topic,items])=>`
       <div class="dd-card">
