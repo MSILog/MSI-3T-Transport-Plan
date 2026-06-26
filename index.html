@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Three Trees TMS</title>
+<title>MSI-3T Order Planning</title>
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -196,13 +196,12 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
   <div class="lc">
     <div class="lc-logo">
       <div class="lc-logo-icon"><svg viewBox="0 0 24 24"><path d="M1 3h15l2 5H1V3z"/><path d="M1 8v8a1 1 0 001 1h1m16 0h1a1 1 0 001-1v-5l-3-3H1"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg></div>
-      <h1>Three Trees TMS</h1><p>Truck Consolidation System</p>
+      <h1>MSI-3T</h1><p>Order Planning</p>
     </div>
     <div class="lc-f"><label>Username</label><input type="text" id="lu" placeholder="Enter username" autocomplete="username"></div>
-    <div class="lc-f"><label>Password</label><input type="password" id="lp" placeholder="Enter password" onkeydown="if(event.key==='Enter')doLogin()"></div>
-    <button class="lc-btn" id="lbtn" onclick="doLogin()">Sign in</button>
+    <div class="lc-f"><label>Password</label><input type="password" id="lp" placeholder="Enter password"></div>
+    <button class="lc-btn" id="lbtn">Sign in</button>
     <div class="lc-err" id="lerr"></div>
-    <div style="text-align:center;margin-top:18px;font-size:12px;color:var(--gray)">Three Trees Transport Co., Ltd.</div>
   </div>
 </div>
 
@@ -211,7 +210,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
   <div class="topbar">
     <div class="t-logo">
       <svg viewBox="0 0 24 24"><path d="M1 3h15l2 5H1V3z"/><path d="M1 8v8a1 1 0 001 1h1m16 0h1a1 1 0 001-1v-5l-3-3H1"/><circle cx="6" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-      Three Trees TMS
+      Three Trees MSI-3T
     </div>
     <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.5)">
       <div class="api-dot" id="api-dot"></div><span id="api-st">Demo mode</span>
@@ -645,33 +644,40 @@ function v(id){return document.getElementById(id)?.value?.trim()||'';}
 function badge(s){const m={Pending:'b-pending',Confirmed:'b-confirmed','In Transit':'b-transit',Delivered:'b-delivered'};return `<span class="badge ${m[s]||'b-pending'}">${s}</span>`;}
 
 /* ═══════════════ AUTH ═══════════════ */
-async function doLogin(){
-  const u=document.getElementById('lu').value.trim(), p=document.getElementById('lp').value;
-  const btn=document.getElementById('lbtn'), err=document.getElementById('lerr');
-  if(!u||!p){err.textContent='Enter username and password.';err.style.display='block';return;}
-  btn.innerHTML='<span class="spinner"></span> Signing in…'; btn.disabled=true; err.style.display='none';
+function doLogin(){
+  var u = document.getElementById('lu').value.trim();
+  var p = document.getElementById('lp').value.trim();
+  var err = document.getElementById('lerr');
 
-  // Always check demo credentials — works even with no API URL
-  const demo={wapat:{role:'cs',fullName:'Wapat S.'},somchai:{role:'transport',fullName:'Somchai T.'},admin:{role:'admin',fullName:'Admin'},diskorn:{role:'management',fullName:'Khun Diskorn'}};
+  err.style.display = 'none';
+  err.textContent = '';
 
-  let res;
-  if(API_URL){
-    try{ res=await api({action:'login',username:u,password:p}); }
-    catch(e){ res=null; }
-    // If API fails, fall back to demo login
-    if(!res||!res.ok) res=demo[u]?{ok:true,...demo[u]}:{ok:false,error:'Invalid username or password'};
-  } else {
-    res=demo[u]?{ok:true,...demo[u]}:{ok:false,error:'Invalid username or password'};
+  if(!u || !p){
+    err.textContent = 'Please enter username and password.';
+    err.style.display = 'block';
+    return;
   }
 
-  btn.innerHTML='Sign in'; btn.disabled=false;
-  if(res.ok){
-    SESSION=res;
-    document.getElementById('login-page').style.display='none';
-    document.getElementById('app').style.display='flex';
-    try{ applyRole(); } catch(e){ console.error('applyRole error:',e); }
-    try{ loadAll(); } catch(e){ console.error('loadAll error:',e); }
-  } else { err.textContent=res.error||'Login failed.'; err.style.display='block'; }
+  var demo = {
+    wapat:   {role:'cs',         fullName:'Wapat S.'},
+    somchai: {role:'transport',  fullName:'Somchai T.'},
+    admin:   {role:'admin',      fullName:'Admin'},
+    diskorn: {role:'management', fullName:'Khun Diskorn'}
+  };
+
+  var match = demo[u];
+  if(!match){
+    err.textContent = 'Invalid username or password.';
+    err.style.display = 'block';
+    return;
+  }
+
+  SESSION = {ok:true, role:match.role, fullName:match.fullName, username:u};
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+
+  try{ applyRole(); }  catch(e){ console.error('applyRole:', e); }
+  try{ loadAll(); }    catch(e){ console.error('loadAll:', e); }
 }
 function doLogout(){
   SESSION=null; JOBS=[];
@@ -1271,6 +1277,11 @@ function goto(page,el){
 
 // Close overlay on background click
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+// Login button and Enter key
+document.getElementById('lbtn').addEventListener('click', doLogin);
+document.getElementById('lp').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+document.getElementById('lu').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
 </script>
 </body>
 </html>
