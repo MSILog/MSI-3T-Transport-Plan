@@ -619,12 +619,18 @@ let API_URL = localStorage.getItem('tms_api_url')||'';
 let PDF_TMPL = null;
 let SESSION  = null;
 let JOBS     = [];
-let RULES    = JSON.parse(localStorage.getItem('tms_rules')||'{"match":"province","sameDate":"same","thresh":"75"}');
 let currentPDFJob = null;
 let calYear, calMonth;
 
-/* Dropdown store — each key = topic, value = array of items */
-let DROPDOWNS = JSON.parse(localStorage.getItem('tms_dropdowns')||JSON.stringify({
+function safeJSON(key, fallback){
+  try{ var v=localStorage.getItem(key); return v?JSON.parse(v):fallback; }
+  catch(e){ console.warn('Bad localStorage key:',key,e); return fallback; }
+}
+
+let RULES = safeJSON('tms_rules', {match:'province',sameDate:'same',thresh:'75'});
+
+/* Dropdown store */
+let DROPDOWNS = safeJSON('tms_dropdowns', {
   'Job Type':['10W','6W','4W','Pickup Truck','Crane Truck'],
   'Transportation Area':['Central Thailand','Eastern Seaboard','Northern Region','Northeastern Region','Southern Region','Western Region'],
   'Vehicle':['TH-001 (10W)','TH-002 (6W)','TH-003 (4W)','TH-004 (Pickup)','TH-005 (10W)'],
@@ -632,7 +638,7 @@ let DROPDOWNS = JSON.parse(localStorage.getItem('tms_dropdowns')||JSON.stringify
   'Province':['Bangkok','Chonburi','Rayong','Samut Prakan','Pathum Thani','Nonthaburi','Samut Sakhon','Ayutthaya','Chachoengsao','Prachinburi','Chiang Mai','Chiang Rai','Khon Kaen','Udon Thani','Nakhon Ratchasima','Songkhla','Surat Thani','Phuket','Nakhon Si Thammarat','Hat Yai'],
   'Customer':['KUKA Thailand','Toyota Tsusho','Denso Thailand','Bridgestone','MSI Logistics','Honda Ayutthaya','PTT Chemical','Central Group','Isuzu','Aapico Hitech'],
   'Cargo Type':['General cargo','Palletized','Fragile','Temperature controlled','Hazmat','Auto parts','Chemical'],
-}));
+});
 
 function saveDDs(){ localStorage.setItem('tms_dropdowns', JSON.stringify(DROPDOWNS)); }
 
@@ -1274,6 +1280,12 @@ function goto(page,el){
   if(page==='dropdowns')renderDropdowns();
   if(page==='dashboard')renderDashboard();
 }
+
+// Clear any corrupt localStorage keys from old versions
+['tms_dropdowns','tms_rules'].forEach(function(k){
+  var v = localStorage.getItem(k);
+  if(v){ try{ JSON.parse(v); } catch(e){ localStorage.removeItem(k); console.warn('Cleared corrupt key:',k); } }
+});
 
 // Close overlay on background click
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
