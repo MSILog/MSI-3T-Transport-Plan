@@ -669,7 +669,8 @@ async function doLogin(){
     SESSION=res;
     document.getElementById('login-page').style.display='none';
     document.getElementById('app').style.display='flex';
-    applyRole(); loadAll();
+    try{ applyRole(); } catch(e){ console.error('applyRole error:',e); }
+    try{ loadAll(); } catch(e){ console.error('loadAll error:',e); }
   } else { err.textContent=res.error||'Login failed.'; err.style.display='block'; }
 }
 function doLogout(){
@@ -709,11 +710,16 @@ function setApiStatus(ok){
 
 /* ═══════════════ LOAD DATA ═══════════════ */
 async function loadAll(){
-  if(API_URL){
-    const res=await api({action:'getJobs'});
-    if(res.ok){JOBS=res.jobs;setApiStatus(true);}
-    else{setApiStatus(false);loadDemo();}
-  } else {setApiStatus(false);loadDemo();}
+  try{
+    if(API_URL){
+      const res=await api({action:'getJobs'});
+      if(res&&res.ok){JOBS=res.jobs;setApiStatus(true);}
+      else{setApiStatus(false);loadDemo();}
+    } else {setApiStatus(false);loadDemo();}
+  } catch(e){
+    console.error('loadAll error:',e);
+    loadDemo();
+  }
   const today=new Date();
   calYear=today.getFullYear(); calMonth=today.getMonth();
   renderAll();
@@ -1058,6 +1064,8 @@ async function deleteJob(jobId){
   toast(`Job ${jobId} deleted`);
   renderAll();
 }
+
+async function confirmConsolidation(idx){
   const groups=getConsolidationGroups();
   if(!groups[idx])return;
   const grp=groups[idx].jobs;
