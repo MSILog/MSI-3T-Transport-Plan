@@ -192,7 +192,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
       <div class="nav-item" id="nav-jobs" data-page="jobs">
         <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg><span>Job Orders</span>
       </div>
-      <div class="nav-item" id="nav-myjobs" data-page="myjobs">
+      <div class="nav-item" id="nav-myjobs" data-page="myjobs" style="display:none">
         <svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg><span>My Jobs</span>
       </div>
       <div class="nav-item" id="nav-consolidate" data-page="consolidate" style="display:none">
@@ -686,8 +686,14 @@ function applyRole() {
 function loadAll() {
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
-      if(res && res.ok) { JOBS = res.jobs; setApiStatus(true); }
-      else { setApiStatus(false); loadDemo(); }
+      if(res && res.ok && Array.isArray(res.jobs) && res.jobs.length > 0) {
+        JOBS = res.jobs; setApiStatus(true);
+      } else if(res && res.ok && Array.isArray(res.jobs)) {
+        // Connected but no jobs yet - start with empty array
+        JOBS = []; setApiStatus(true);
+      } else {
+        setApiStatus(false); loadDemo();
+      }
       renderAll();
     });
   } else {
@@ -715,6 +721,7 @@ function loadDemo() {
 }
 
 function renderAll() {
+  if(!Array.isArray(JOBS)) JOBS = [];
   try { renderDashboard(); } catch(e) { console.error('dashboard:', e); }
   try { renderJobsTable(); } catch(e) { console.error('jobs:', e); }
   try { renderConsolidation(); } catch(e) { console.error('consolidation:', e); }
@@ -723,7 +730,13 @@ function renderAll() {
 }
 
 // ── CALENDAR ───────────────────────────────────────────
+// Polyfill padStart for older browsers
+if(!String.prototype.padStart){String.prototype.padStart=function(len,ch){var s=String(this);ch=ch||' ';while(s.length<len)s=ch+s;return s;};}
+
 function renderDashboard() {
+  if(!Array.isArray(JOBS)) JOBS = [];
+  if(!calYear) calYear = new Date().getFullYear();
+  if(calMonth === undefined || calMonth === null) calMonth = new Date().getMonth();
   var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var headers = '';
   for(var i=0; i<days.length; i++) headers += '<div class="cal-day-hdr">' + days[i] + '</div>';
