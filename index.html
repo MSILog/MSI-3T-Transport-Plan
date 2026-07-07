@@ -665,6 +665,7 @@ function applyRole() {
   document.getElementById('tav').textContent = initials;
   document.getElementById('trb').textContent = names[r] || r;
   document.getElementById('btn-new-job').style.display = (r==='cs'||r==='admin') ? '' : 'none';
+  document.getElementById('nav-jobs').style.display = (r==='cs') ? 'none' : 'flex';
   document.getElementById('nav-consolidate').style.display = (r==='transport'||r==='admin') ? 'flex' : 'none';
   document.getElementById('nav-myjobs').style.display = (r==='cs'||r==='admin') ? 'flex' : 'none';
   document.getElementById('nav-admin').style.display = (r==='admin') ? 'flex' : 'none';
@@ -683,16 +684,56 @@ function applyRole() {
 }
 
 // ── DATA ───────────────────────────────────────────────
+// Normalize a job object from the API (camelCase keys) to the PascalCase the app uses internally
+function normalizeJob(j) {
+  if(!j) return j;
+  // If already PascalCase (has JobID), pass through
+  if(j.JobID) return j;
+  // Map camelCase API keys -> PascalCase internal keys
+  return {
+    JobID:              j.jobId      || j.jobID      || j.JobID      || '',
+    RefNo:              j.refNo      || j.RefNo      || '',
+    Customer:           j.customer   || j.Customer   || '',
+    ShortDesc:          j.shortDesc  || j.ShortDesc  || '',
+    JobType:            j.jobType    || j.JobType    || '',
+    StartDate:          j.startDate  || j.StartDate  || '',
+    StartTime:          j.startTime  || j.StartTime  || '',
+    EndDate:            j.endDate    || j.EndDate    || '',
+    EndTime:            j.endTime    || j.EndTime    || '',
+    PickupLocation:     j.pickupLocation  || j.PickupLocation  || '',
+    PickupLocationUrl:  j.pickupLocationUrl || j.PickupLocationUrl || '',
+    PickupContact:      j.pickupContact || j.PickupContact || '',
+    DeliveryLocation:   j.deliveryLocation || j.DeliveryLocation || '',
+    DeliveryContact:    j.deliveryContact  || j.DeliveryContact  || '',
+    DeliveryPoints:     j.deliveryPoints   || j.DeliveryPoints   || [],
+    ReturnPoint:        j.returnPoint  || j.ReturnPoint  || '',
+    ReturnContact:      j.returnContact || j.ReturnContact || '',
+    XRay:               j.xray       || j.XRay       || '',
+    Dimensions:         j.dimensions || j.Dimensions || '',
+    KGS:                j.kgs        || j.KGS        || '',
+    CargoType:          j.cargoType  || j.CargoType  || '',
+    Trucks:             j.trucks     || j.Trucks     || [],
+    Amount:             j.amount     || j.Amount     || '',
+    DriverDetails:      j.driverDetails || j.DriverDetails || '',
+    Remark:             j.remark     || j.Remark     || '',
+    Status:             j.status     || j.Status     || 'Pending',
+    ConsolidationGroup: j.consolidationGroup || j.ConsolidationGroup || '',
+    CreatedBy:          j.createdBy  || j.CreatedBy  || '',
+    CreatedAt:          j.createdAt  || j.CreatedAt  || '',
+    UpdatedAt:          j.updatedAt  || j.UpdatedAt  || '',
+    UploadedFiles:      j.uploadedFiles || j.UploadedFiles || null
+  };
+}
+
 function loadAll() {
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
-      if(res && res.ok && Array.isArray(res.jobs) && res.jobs.length > 0) {
-        JOBS = res.jobs; setApiStatus(true);
-      } else if(res && res.ok && Array.isArray(res.jobs)) {
-        // Connected but no jobs yet - start with empty array
-        JOBS = []; setApiStatus(true);
+      if(res && res.ok && Array.isArray(res.jobs)) {
+        JOBS = res.jobs.map(normalizeJob);
+        setApiStatus(true);
       } else {
-        setApiStatus(false); loadDemo();
+        setApiStatus(false);
+        loadDemo();
       }
       renderAll();
     });
@@ -1248,6 +1289,8 @@ function doLogin() {
   document.getElementById('login-page').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   try{ applyRole(); }  catch(e){ console.error('applyRole:', e); }
+  // CS lands on My Jobs; everyone else lands on Dashboard
+  if(SESSION.role === 'cs') { goto('myjobs'); }
   try{ loadAll(); }    catch(e){ console.error('loadAll:', e); }
 }
 
@@ -1393,7 +1436,7 @@ function saveAPIUrl() {
   var res = document.getElementById('conn-res');
   res.textContent='Testing...'; res.style.color='var(--gray)';
   apiCall({action:'getJobs'},function(r){
-    if(r&&r.ok){res.textContent='\u2713 Connected \u2014 '+r.jobs.length+' jobs';res.style.color='var(--green)';JOBS=r.jobs;setApiStatus(true);renderAll();}
+    if(r&&r.ok){res.textContent='\u2713 Connected \u2014 '+r.jobs.length+' jobs';res.style.color='var(--green)';JOBS=r.jobs.map(normalizeJob);setApiStatus(true);renderAll();}
     else{res.textContent='\u2717 '+(r?r.error:'Failed');res.style.color='var(--red)';setApiStatus(false);}
   });
 }
