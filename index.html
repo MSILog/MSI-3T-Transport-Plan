@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MSI-3T Order Planning</title>
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;background:#f0f2f5;color:#1a1a2e}
@@ -45,7 +46,7 @@ button,input,select,textarea{font-family:inherit;font-size:13px}
 .card-hdr{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:#fafafa}
 .card-title{font-size:14px;font-weight:600;color:var(--navy)}
 .card-body{padding:16px}
-.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
 .metric{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;box-shadow:var(--sh)}
 .m-icon{width:34px;height:34px;border-radius:7px;display:flex;align-items:center;justify-content:center;margin-bottom:9px}
 .m-icon svg{width:17px;height:17px;stroke:#fff;fill:none;stroke-width:2}
@@ -89,9 +90,6 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 .mj-tab{display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:13px;font-weight:500;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer}
 .mj-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
 .mj-tab svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
-.mj-qty-row{padding:14px 20px 10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px}
-.mj-qty-lbl{font-size:13px;color:#555;white-space:nowrap;min-width:160px;text-align:right}
-.mj-qty-inp{width:440px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--r)}
 .mj-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:8px 20px 16px}
 .mj-col{padding:4px 8px}
 .mj-col-divider{border-left:1px solid var(--border)}
@@ -194,19 +192,18 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
       <div class="nav-item" id="nav-jobs" data-page="jobs">
         <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg><span>Job Orders</span>
       </div>
-      <div class="nav-item" id="nav-consolidate" data-page="consolidate" style="display:none">
-        <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span>AI Consolidation</span>
+      <div class="nav-item" id="nav-myjobs" data-page="myjobs">
+        <svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg><span>My Jobs</span>
       </div>
-      <div class="nav-item" id="nav-dispatch" data-page="dispatch" style="display:none">
-        <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg><span>Dispatch</span>
+      <div class="nav-item" id="nav-consolidate" data-page="consolidate" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span>Consolidation</span>
       </div>
       <div class="s-sec">Config</div>
+      <div class="nav-item" id="nav-locations" data-page="locations">
+        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Locations</span>
+      </div>
       <div class="nav-item" id="nav-dropdowns" data-page="dropdowns">
         <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Dropdowns</span>
-      </div>
-      <div class="s-sec">Reports</div>
-      <div class="nav-item" id="nav-reports" data-page="reports">
-        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Reports</span>
       </div>
       <div class="nav-item" id="nav-admin" data-page="admin" style="display:none">
         <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Users</span>
@@ -243,31 +240,57 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           <div style="display:flex;gap:8px;align-items:center">
             <select id="jobs-filter" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">
               <option value="">All statuses</option>
-              <option>Pending</option><option>Confirmed</option><option>In Transit</option><option>Delivered</option>
+              <option>Pending</option><option>Confirmed</option><option>Complete</option>
             </select>
             <button class="btn btn-primary btn-sm" id="btn-new-job" style="display:none">+ New Job</button>
           </div>
         </div>
         <div class="card"><div class="tw"><table>
-          <thead><tr><th>Job ID</th><th>Ref No.</th><th>Customer</th><th>Pickup</th><th>Delivery</th><th>Start Date</th><th>Vehicle</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Job ID</th><th>MSI Job No.</th><th>Customer</th><th>Pickup</th><th>Delivery</th><th>Start Date</th><th>Status</th><th></th></tr></thead>
           <tbody id="jobs-tbody"></tbody>
         </table></div></div>
       </div>
 
+      <div class="page" id="page-myjobs">
+        <div class="page-hdr">
+          <div><div class="page-title">My Jobs</div><div class="page-sub" id="myjobs-sub">Your submitted job orders</div></div>
+          <button class="btn btn-primary btn-sm" id="btn-myjobs-new">+ New Job</button>
+        </div>
+        <div class="metrics" id="myjobs-metrics" style="grid-template-columns:repeat(3,1fr)"></div>
+        <div class="card">
+          <div class="card-hdr">
+            <span class="card-title" id="myjobs-card-title">Job Orders</span>
+            <div style="display:flex;gap:8px">
+              <select id="myjobs-filter" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">
+                <option value="">All statuses</option>
+                <option>Pending</option><option>Confirmed</option><option>Complete</option>
+              </select>
+            </div>
+          </div>
+          <div class="tw"><table>
+            <thead><tr><th>Job ID</th><th>MSI Job No.</th><th>Customer</th><th>Pickup</th><th>Delivery</th><th>Date</th><th>Status</th><th>Progress</th></tr></thead>
+            <tbody id="myjobs-tbody"></tbody>
+          </table></div>
+        </div>
+      </div>
+
       <div class="page" id="page-consolidate">
         <div class="page-hdr">
-          <div><div class="page-title">AI Consolidation</div><div class="page-sub">Smart truck grouping — confirm to assign same truck</div></div>
+          <div><div class="page-title">Consolidation</div><div class="page-sub">Smart truck grouping — confirm to assign same truck</div></div>
           <button class="btn btn-primary btn-sm" id="btn-runai">Re-run AI</button>
         </div>
         <div id="ai-insights"></div>
         <div id="consolidate-content"></div>
       </div>
 
-      <div class="page" id="page-dispatch">
-        <div class="page-hdr"><div><div class="page-title">Dispatch</div><div class="page-sub">Generate documents for confirmed jobs</div></div></div>
+      <div class="page" id="page-locations">
+        <div class="page-hdr">
+          <div><div class="page-title">Saved Locations</div><div class="page-sub">Named places with Google Maps links</div></div>
+          <button class="btn btn-primary btn-sm" id="btn-add-loc">+ Add Location</button>
+        </div>
         <div class="card"><div class="tw"><table>
-          <thead><tr><th>Job ID</th><th>Customer</th><th>Pickup</th><th>Delivery</th><th>Date</th><th>Status</th><th>Document</th></tr></thead>
-          <tbody id="dispatch-tbody"></tbody>
+          <thead><tr><th>Name</th><th>Address</th><th>Google Maps</th><th></th></tr></thead>
+          <tbody id="locs-tbody"></tbody>
         </table></div></div>
       </div>
 
@@ -276,16 +299,13 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
         <div id="dd-content"></div>
       </div>
 
-      <div class="page" id="page-reports">
-        <div class="page-hdr"><div class="page-title">Reports</div></div>
-        <div class="metrics" id="report-metrics"></div>
-        <div class="card"><div class="card-hdr"><span class="card-title">Jobs by delivery province</span></div><div class="card-body" id="zone-chart"></div></div>
-      </div>
-
       <div class="page" id="page-admin">
-        <div class="page-hdr"><div class="page-title">User Management</div></div>
+        <div class="page-hdr">
+          <div class="page-title">User Management</div>
+          <button class="btn btn-primary btn-sm" id="btn-add-user">+ Add User</button>
+        </div>
         <div class="card"><div class="tw"><table>
-          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th></tr></thead>
+          <thead><tr><th>Full Name</th><th>Username</th><th>Role</th><th>Email (notifications)</th><th>Status</th><th></th></tr></thead>
           <tbody id="users-tbody"></tbody>
         </table></div></div>
       </div>
@@ -311,7 +331,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           </div>
         </div>
         <div class="card">
-          <div class="card-hdr"><span class="card-title">AI Consolidation rules</span></div>
+          <div class="card-hdr"><span class="card-title">Consolidation rules</span></div>
           <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Zone matching</label>
@@ -351,6 +371,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
   <div class="modal">
     <div class="modal-hdr">
       <span class="modal-title" id="mj-title">Manage Job » Add</span>
+      <span id="mj-created-by" style="font-size:12px;color:var(--gray);margin-left:12px"></span>
       <button class="btn btn-sm btn-icon" id="btn-close-job">✕</button>
     </div>
     <div>
@@ -360,41 +381,80 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           Job Detail
         </div>
       </div>
-      <div class="mj-qty-row">
-        <div class="mj-qty-lbl">จำนวนงานที่ต้องการเพิ่ม:</div>
-        <input type="number" class="mj-qty-inp" id="j-qty" value="1" min="1" max="10">
-      </div>
       <div class="mj-form-grid">
+        <!-- ── LEFT COLUMN ── -->
         <div class="mj-col">
-          <div class="mj-field"><div class="mj-fl">Ref no.:</div><div class="mj-fc"><input type="text" id="j-ref"></div></div>
+          <div style="background:var(--blue-l);border-left:3px solid var(--blue);padding:6px 10px;margin-bottom:10px;border-radius:0 var(--r) var(--r) 0;font-size:12px;font-weight:600;color:var(--blue)">Fill by CS Team</div>
+          <div class="mj-field"><div class="mj-fl">MSI Job No.:</div><div class="mj-fc"><input type="text" id="j-ref"></div></div>
           <div class="mj-field"><div class="mj-fl">Short Description:</div><div class="mj-fc"><input type="text" id="j-desc"></div></div>
           <div class="mj-field"><div class="mj-fl">Customer:</div><div class="mj-fc"><input type="text" id="j-customer" list="customer-list"><datalist id="customer-list"></datalist></div></div>
-          <div class="mj-field"><div class="mj-fl">Job Type:</div><div class="mj-fc"><select id="j-jobtype"></select></div></div>
-          <div class="mj-field"><div class="mj-fl">Transportation Area:</div><div class="mj-fc"><select id="j-area"></select></div></div>
+          <div class="mj-field"><div class="mj-fl">Cargo Type:</div><div class="mj-fc"><select id="j-cargo-type-left"></select></div></div>
           <div class="mj-field"><div class="mj-fl">Start Date:</div><div class="mj-fc"><div class="mj-fc-row"><input type="date" id="j-start-date" style="flex:1"><input type="time" id="j-start-time" style="width:90px"></div></div></div>
           <div class="mj-field"><div class="mj-fl">End Date:</div><div class="mj-fc"><div class="mj-fc-row"><input type="date" id="j-end-date" style="flex:1"><input type="time" id="j-end-time" style="width:90px"></div></div></div>
-          <div class="mj-field"><div class="mj-fl"></div><div class="mj-fc"><div class="mj-fc-row"><button class="mj-btn-green">GPS Mileage</button><button class="mj-btn-green">View Route</button></div></div></div>
           <div class="mj-field">
-            <div class="mj-fl">Add Point:</div>
+            <div class="mj-fl">Pickup Point:</div>
             <div class="mj-fc">
-              <div class="mj-fc-row"><input type="text" id="j-pickup" list="location-list"><datalist id="location-list"></datalist><button class="mj-btn-sm" id="btn-add-point">+</button></div>
-              <div id="delivery-points" style="margin-top:6px"></div>
-              <button class="mj-btn-green" style="margin-top:6px" id="btn-routing">Routing</button>
+              <input type="text" id="j-pickup-manual" list="saved-locations-list" placeholder="Type address or select saved location">
+              <datalist id="saved-locations-list"></datalist>
+              <div id="j-pickup-map-link" style="margin-top:4px"></div>
             </div>
           </div>
-        </div>
-        <div class="mj-col mj-col-divider">
-          <div class="mj-field"><div class="mj-fl">Vehicle:</div><div class="mj-fc"><select id="j-vehicle"></select></div></div>
-          <div class="mj-field"><div class="mj-fl">หางพ่วง:</div><div class="mj-fc"><select id="j-trailer"></select></div></div>
-          <div class="mj-field"><div class="mj-fl">Charge:</div><div class="mj-fc"><input type="number" id="j-charge" step="0.01"></div></div>
+          <div class="mj-field">
+            <div class="mj-fl">Contact person pickup:</div>
+            <div class="mj-fc"><input type="text" id="j-pickup-contact" placeholder="Name and phone number"></div>
+          </div>
+          <div class="mj-field">
+            <div class="mj-fl">Delivery Points:</div>
+            <div class="mj-fc">
+              <div id="delivery-points"></div>
+              <button class="mj-btn-green" style="margin-top:6px" id="btn-add-point">+ Add delivery point</button>
+            </div>
+          </div>
+          <div class="mj-field">
+            <div class="mj-fl">Contact person delivery:</div>
+            <div class="mj-fc"><input type="text" id="j-delivery-contact" placeholder="Name and phone number"></div>
+          </div>
+          <div class="mj-field">
+            <div class="mj-fl">Container Return Point:</div>
+            <div class="mj-fc">
+              <input type="text" id="j-return-point" list="saved-locations-list" placeholder="Type address or select saved location">
+              <div id="j-return-map-link" style="margin-top:4px"></div>
+            </div>
+          </div>
+          <div class="mj-field">
+            <div class="mj-fl">Contact person return:</div>
+            <div class="mj-fc"><input type="text" id="j-return-contact" placeholder="Name and phone number"></div>
+          </div>
           <div class="mj-field"><div class="mj-fl">X-Ray:</div><div class="mj-fc"><select id="j-xray"><option>Yes</option><option>No</option></select></div></div>
-          <div class="mj-field"><div class="mj-fl">Remark:</div><div class="mj-fc"><textarea id="j-remark"></textarea></div></div>
-          <div class="mj-field"><div class="mj-fl">Pickup Province:</div><div class="mj-fc"><select id="j-pickup-prov"></select></div></div>
-          <div class="mj-field"><div class="mj-fl">Pickup Postal:</div><div class="mj-fc"><input type="text" id="j-pickup-postal" maxlength="5" placeholder="10250"></div></div>
-          <div class="mj-field"><div class="mj-fl">Delivery Province:</div><div class="mj-fc"><select id="j-deliv-prov"></select></div></div>
-          <div class="mj-field"><div class="mj-fl">Delivery Postal:</div><div class="mj-fc"><input type="text" id="j-deliv-postal" maxlength="5" placeholder="20000"></div></div>
-          <div class="mj-field"><div class="mj-fl">Pieces:</div><div class="mj-fc"><input type="number" id="j-pieces" min="0"></div></div>
-          <div class="mj-field"><div class="mj-fl">Cargo Type:</div><div class="mj-fc"><select id="j-cargo-type"></select></div></div>
+          <div class="mj-field"><div class="mj-fl">Dimensions:</div><div class="mj-fc"><input type="text" id="j-dimensions" placeholder="L x W x H (cm)"></div></div>
+          <div class="mj-field"><div class="mj-fl">KGS:</div><div class="mj-fc"><input type="number" id="j-kgs" placeholder="0.0" min="0" step="0.1"></div></div>
+          <div class="mj-field"><div class="mj-fl">Remark:</div><div class="mj-fc"><textarea id="j-remark" style="min-height:60px;resize:vertical"></textarea></div></div>
+        </div>
+        <!-- ── RIGHT COLUMN ── -->
+        <div class="mj-col mj-col-divider">
+          <div style="background:#f0fdf4;border-left:3px solid var(--green);padding:6px 10px;margin-bottom:10px;border-radius:0 var(--r) var(--r) 0;font-size:12px;font-weight:600;color:var(--green)">Fill by Transport Team</div>
+          <!-- Truck rows -->
+          <div id="truck-rows">
+            <div class="truck-row" data-idx="0">
+              <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+                Truck 1 <button class="mj-btn-sm remove-truck" style="background:var(--red);display:none">Remove</button>
+              </div>
+              <div class="mj-field"><div class="mj-fl">Job Type:</div><div class="mj-fc"><select class="j-truck-type"></select></div></div>
+              <div class="mj-field"><div class="mj-fl">Amount:</div><div class="mj-fc"><input type="number" class="j-truck-amount" placeholder="0" min="0" step="1"></div></div>
+              <div class="mj-field"><div class="mj-fl">Driver Details:</div><div class="mj-fc"><textarea class="j-truck-driver" placeholder="Driver name, phone, license plate" style="min-height:60px;resize:vertical"></textarea></div></div>
+            </div>
+          </div>
+          <button class="mj-btn-green" style="margin-top:6px;margin-bottom:14px" id="btn-add-truck">+ Add truck</button>
+          <div style="border-top:1px solid var(--border);margin:10px 0 12px"></div>
+
+          <div class="mj-field">
+            <div class="mj-fl">Additional File:</div>
+            <div class="mj-fc">
+              <input type="file" id="upload-additional" accept=".pdf" style="display:none">
+              <button class="mj-btn-sm" id="btn-upload-additional" type="button">Upload PDF</button>
+              <span id="status-additional" style="font-size:12px;color:var(--gray);margin-left:8px"></span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -437,12 +497,93 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 
 <div id="toast"></div>
 
+<!-- USER MODAL -->
+<div class="overlay" id="modal-user">
+  <div class="modal" style="width:480px">
+    <div class="modal-hdr">
+      <span class="modal-title" id="user-modal-title">Add User</span>
+      <button class="btn btn-sm btn-icon" id="btn-close-user">X</button>
+    </div>
+    <div style="padding:20px">
+      <div style="margin-bottom:13px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Full Name *</label>
+        <input type="text" id="u-fullname" placeholder="e.g. Wapat S." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+      </div>
+      <div style="margin-bottom:13px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Username *</label>
+        <input type="text" id="u-username" placeholder="e.g. wapat" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+      </div>
+      <div style="margin-bottom:13px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Password *</label>
+        <input type="password" id="u-password" placeholder="Enter password" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+        <div style="font-size:11px;color:var(--gray);margin-top:3px">Leave blank when editing to keep existing password.</div>
+      </div>
+      <div style="margin-bottom:13px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Role *</label>
+        <select id="u-role" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+          <option value="cs">Customer Service (CS)</option>
+          <option value="transport">Transport</option>
+          <option value="admin">Admin</option>
+          <option value="management">Management</option>
+        </select>
+      </div>
+      <div style="margin-bottom:13px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Email (for job confirmed notifications)</label>
+        <input type="email" id="u-email" placeholder="email@example.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+        <div style="font-size:11px;color:var(--gray);margin-top:3px">When a job they created is confirmed, they receive an email automatically.</div>
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Status</label>
+        <select id="u-active" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" id="btn-cancel-user">Cancel</button>
+      <button class="btn btn-red btn-sm" id="btn-delete-user" style="display:none;margin-right:auto">Delete User</button>
+      <button class="btn btn-primary" id="btn-save-user">Save User</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOCATION MODAL -->
+<div class="overlay" id="modal-loc">
+  <div class="modal" style="width:520px">
+    <div class="modal-hdr">
+      <span class="modal-title" id="loc-modal-title">Add Location</span>
+      <button class="btn btn-sm btn-icon" id="btn-close-loc">X</button>
+    </div>
+    <div style="padding:20px">
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Location Name *</label>
+        <input type="text" id="loc-name" placeholder="e.g. KUKA Warehouse Bangkok" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Address / Description</label>
+        <input type="text" id="loc-address" placeholder="e.g. 9 Seri Villa, Prawet, Bangkok 10250" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
+      </div>
+      <div style="margin-bottom:6px">
+        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Google Maps Link *</label>
+        <input type="url" id="loc-url" placeholder="https://maps.app.goo.gl/..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:monospace;font-size:12px">
+        <div style="font-size:11px;color:var(--gray);margin-top:4px">Google Maps &rarr; right-click pin &rarr; "Copy link" or Share &rarr; Copy link</div>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" id="btn-cancel-loc">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-loc">Save Location</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── STATE ──────────────────────────────────────────────
 var API_URL = localStorage.getItem('tms_api_url') || '';
 var PDF_TMPL = null;
 var SESSION = null;
 var JOBS = [];
+var UPLOADED_FILES = {air:null, sea:null, ot:null, additional:null};
 var currentPDFJob = null;
 var calYear = new Date().getFullYear();
 var calMonth = new Date().getMonth();
@@ -463,8 +604,13 @@ var DROPDOWNS = safeJSON('tms_dropdowns', {
   'Customer': ['KUKA Thailand','Toyota Tsusho','Denso Thailand','Bridgestone','MSI Logistics','Honda Ayutthaya','PTT Chemical','Central Group','Isuzu','Aapico Hitech'],
   'Cargo Type': ['General cargo','Palletized','Fragile','Temperature controlled','Hazmat','Auto parts','Chemical']
 });
-
-function saveDDs() { localStorage.setItem('tms_dropdowns', JSON.stringify(DROPDOWNS)); }
+function saveDDs(){ localStorage.setItem('tms_dropdowns', JSON.stringify(DROPDOWNS)); }var LOCATIONS = safeJSON('tms_locations', [
+  {name:'KUKA Warehouse Bangkok', url:'https://maps.app.goo.gl/example1', address:'9 Seri Villa, Prawet, Bangkok 10250'},
+  {name:'AAPICO Structural Chonburi', url:'https://maps.app.goo.gl/example2', address:'Amata City, Chonburi 20160'},
+  {name:'Laem Chabang Port', url:'https://maps.app.goo.gl/example3', address:'Laem Chabang Port, Chonburi 20230'},
+  {name:'WHA Industrial Rayong', url:'https://maps.app.goo.gl/example4', address:'WHA Industrial Estate, Rayong 21140'}
+]);
+function saveLocs(){ localStorage.setItem('tms_locations', JSON.stringify(LOCATIONS)); }
 
 // ── UTILS ──────────────────────────────────────────────
 function toast(msg) {
@@ -478,7 +624,7 @@ function gv(id) { var el = document.getElementById(id); return el ? el.value.tri
 function sv(id, val) { var el = document.getElementById(id); if(el) el.value = val || ''; }
 
 function badge(s) {
-  var cls = {Pending:'b-pending', Confirmed:'b-confirmed', 'In Transit':'b-transit', Delivered:'b-delivered'}[s] || 'b-pending';
+  var cls = {Pending:'b-pending', Confirmed:'b-confirmed', Complete:'b-delivered'}[s] || 'b-pending';
   return '<span class="badge ' + cls + '">' + s + '</span>';
 }
 
@@ -504,27 +650,6 @@ function setApiStatus(ok) {
 }
 
 // ── AUTH ───────────────────────────────────────────────
-function doLogin() {
-  var u = document.getElementById('lu').value.trim();
-  var p = document.getElementById('lp').value.trim();
-  var err = document.getElementById('lerr');
-  err.style.display = 'none';
-  if(!u || !p) { err.textContent = 'Please enter username and password.'; err.style.display = 'block'; return; }
-  var demo = {
-    wapat:   {role:'cs',         fullName:'Wapat S.'},
-    somchai: {role:'transport',  fullName:'Somchai T.'},
-    admin:   {role:'admin',      fullName:'Admin'},
-    diskorn: {role:'management', fullName:'Khun Diskorn'}
-  };
-  var match = demo[u];
-  if(!match) { err.textContent = 'Invalid username or password.'; err.style.display = 'block'; return; }
-  SESSION = {role: match.role, fullName: match.fullName, username: u};
-  document.getElementById('login-page').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  applyRole();
-  loadAll();
-}
-
 function doLogout() {
   SESSION = null; JOBS = [];
   document.getElementById('app').style.display = 'none';
@@ -541,7 +666,7 @@ function applyRole() {
   document.getElementById('trb').textContent = names[r] || r;
   document.getElementById('btn-new-job').style.display = (r==='cs'||r==='admin') ? '' : 'none';
   document.getElementById('nav-consolidate').style.display = (r==='transport'||r==='admin') ? 'flex' : 'none';
-  document.getElementById('nav-dispatch').style.display = (r==='transport'||r==='admin') ? 'flex' : 'none';
+  document.getElementById('nav-myjobs').style.display = (r==='cs'||r==='admin') ? 'flex' : 'none';
   document.getElementById('nav-admin').style.display = (r==='admin') ? 'flex' : 'none';
   var savedUrl = localStorage.getItem('tms_api_url');
   if(savedUrl) sv('api-url-inp', savedUrl);
@@ -578,14 +703,14 @@ function loadDemo() {
     return t.toISOString().split('T')[0];
   };
   JOBS = [
-    {JobID:'TMS-001',RefNo:'REF-001',Customer:'KUKA Thailand',ShortDesc:'Parts delivery',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'9 Seri Villa, Prawet, Bangkok',PickupProvince:'Bangkok',PickupPostal:'10250',DeliveryLocation:'AAPICO Structural, Amata City',DeliveryProvince:'Chonburi',DeliveryPostal:'20140',StartDate:d(0),StartTime:'09:00',EndDate:d(0),EndTime:'17:00',Vehicle:'TH-001 (10W)',Trailer:'TR-001',Charge:'4500',XRay:'No',Pieces:'12',CargoType:'General cargo',Remark:'',Status:'In Transit',ConsolidationGroup:''},
-    {JobID:'TMS-002',RefNo:'REF-002',Customer:'Toyota Tsusho',ShortDesc:'WHA to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'WHA Industrial Estate, Rayong',PickupProvince:'Rayong',PickupPostal:'21140',DeliveryLocation:'Laem Chabang Port Gate 3',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(0),StartTime:'10:00',EndDate:d(0),EndTime:'15:00',Vehicle:'',Trailer:'',Charge:'2200',XRay:'No',Pieces:'6',CargoType:'Palletized',Remark:'',Status:'Confirmed',ConsolidationGroup:''},
-    {JobID:'TMS-003',RefNo:'REF-003',Customer:'Denso Thailand',ShortDesc:'Amata to port',JobType:'6W',Area:'Eastern Seaboard',PickupLocation:'Amata City Industrial, Chonburi',PickupProvince:'Chonburi',PickupPostal:'20160',DeliveryLocation:'Laem Chabang Port Gate 1',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(0),StartTime:'10:30',EndDate:d(0),EndTime:'14:00',Vehicle:'',Trailer:'',Charge:'1800',XRay:'Yes',Pieces:'8',CargoType:'General cargo',Remark:'',Status:'Pending',ConsolidationGroup:''},
-    {JobID:'TMS-004',RefNo:'REF-004',Customer:'Bridgestone',ShortDesc:'Map Ta Phut to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'Bridgestone Plant, Map Ta Phut',PickupProvince:'Rayong',PickupPostal:'21150',DeliveryLocation:'Laem Chabang Port Gate 2',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(0),StartTime:'10:00',EndDate:d(0),EndTime:'15:30',Vehicle:'',Trailer:'',Charge:'2500',XRay:'No',Pieces:'10',CargoType:'General cargo',Remark:'',Status:'Pending',ConsolidationGroup:''},
-    {JobID:'TMS-005',RefNo:'REF-005',Customer:'MSI Logistics',ShortDesc:'BKK internal',JobType:'4W',Area:'Central Thailand',PickupLocation:'Srinakarin Rd, Nong Bon, Bangkok',PickupProvince:'Bangkok',PickupPostal:'10250',DeliveryLocation:'KUKA Warehouse, Bang Na',DeliveryProvince:'Bangkok',DeliveryPostal:'10260',StartDate:d(0),StartTime:'14:00',EndDate:d(0),EndTime:'18:00',Vehicle:'TH-003 (4W)',Trailer:'',Charge:'900',XRay:'No',Pieces:'4',CargoType:'Fragile',Remark:'Handle with care',Status:'Pending',ConsolidationGroup:''},
-    {JobID:'TMS-006',RefNo:'REF-006',Customer:'PTT Chemical',ShortDesc:'Map Ta Phut run',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'PTT Industrial, Map Ta Phut',PickupProvince:'Rayong',PickupPostal:'21150',DeliveryLocation:'Laem Chabang Port Gate 4',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(1),StartTime:'08:00',EndDate:d(1),EndTime:'13:00',Vehicle:'',Trailer:'',Charge:'2800',XRay:'No',Pieces:'5',CargoType:'Hazmat',Remark:'Class 3 flammable',Status:'Pending',ConsolidationGroup:''},
-    {JobID:'TMS-007',RefNo:'REF-007',Customer:'Honda Ayutthaya',ShortDesc:'Ayutthaya to BKK',JobType:'10W',Area:'Central Thailand',PickupLocation:'Honda Plant, Ayutthaya',PickupProvince:'Ayutthaya',PickupPostal:'13160',DeliveryLocation:'Bangkok Port, Klong Toey',DeliveryProvince:'Bangkok',DeliveryPostal:'10110',StartDate:d(1),StartTime:'09:00',EndDate:d(1),EndTime:'15:00',Vehicle:'',Trailer:'',Charge:'3500',XRay:'No',Pieces:'20',CargoType:'Palletized',Remark:'',Status:'Pending',ConsolidationGroup:''},
-    {JobID:'TMS-008',RefNo:'REF-008',Customer:'Isuzu',ShortDesc:'Gateway to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'Isuzu Gateway, Samut Prakan',PickupProvince:'Samut Prakan',PickupPostal:'10540',DeliveryLocation:'Laem Chabang Port Gate 2',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(1),StartTime:'08:30',EndDate:d(1),EndTime:'14:00',Vehicle:'',Trailer:'',Charge:'3800',XRay:'No',Pieces:'15',CargoType:'Auto parts',Remark:'',Status:'Pending',ConsolidationGroup:''}
+    {JobID:'Order26070001',RefNo:'REF-001',Customer:'KUKA Thailand',ShortDesc:'Parts delivery',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'9 Seri Villa, Prawet, Bangkok',PickupProvince:'Bangkok',PickupPostal:'10250',DeliveryLocation:'AAPICO Structural, Amata City',DeliveryProvince:'Chonburi',DeliveryPostal:'20140',StartDate:d(0),StartTime:'09:00',EndDate:d(0),EndTime:'17:00',Vehicle:'TH-001 (10W)',Trailer:'TR-001',Charge:'4500',XRay:'No',CargoType:'General cargo',Remark:'',Status:'Confirmed',ConsolidationGroup:'',CreatedAt:'2026-07-01T08:30:00.000Z',UpdatedAt:'2026-07-02T14:20:00.000Z'},
+    {JobID:'Order26070002',RefNo:'REF-002',Customer:'Toyota Tsusho',ShortDesc:'WHA to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'WHA Industrial Estate, Rayong',PickupProvince:'Rayong',PickupPostal:'21140',DeliveryLocation:'Laem Chabang Port Gate 3',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(0),StartTime:'10:00',EndDate:d(0),EndTime:'15:00',Vehicle:'',Trailer:'',Charge:'2200',XRay:'No',CargoType:'Palletized',Remark:'',Status:'Confirmed',ConsolidationGroup:'',CreatedAt:'2026-07-01T09:00:00.000Z',UpdatedAt:'2026-07-03T10:15:00.000Z'},
+    {JobID:'Order26070003',RefNo:'REF-003',Customer:'Denso Thailand',ShortDesc:'Amata to port',JobType:'6W',Area:'Eastern Seaboard',PickupLocation:'Amata City Industrial, Chonburi',PickupProvince:'Chonburi',PickupPostal:'20160',DeliveryLocation:'Laem Chabang Port Gate 1',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(0),StartTime:'10:30',EndDate:d(0),EndTime:'14:00',Vehicle:'',Trailer:'',Charge:'1800',XRay:'Yes',CargoType:'General cargo',Remark:'',Status:'Pending',ConsolidationGroup:'',CreatedAt:'2026-07-03T07:45:00.000Z',UpdatedAt:'2026-07-03T07:45:00.000Z'},
+    {JobID:'Order26070004',RefNo:'REF-004',Customer:'Bridgestone',ShortDesc:'Map Ta Phut to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'Bridgestone Plant, Map Ta Phut',PickupProvince:'Rayong',PickupPostal:'21150',DeliveryLocation:'Laem Chabang Port Gate 2',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(0),StartTime:'10:00',EndDate:d(0),EndTime:'15:30',Vehicle:'',Trailer:'',Charge:'2500',XRay:'No',CargoType:'General cargo',Remark:'',Status:'Pending',ConsolidationGroup:'',CreatedAt:'2026-07-03T08:00:00.000Z',UpdatedAt:'2026-07-03T08:00:00.000Z'},
+    {JobID:'Order26070005',RefNo:'REF-005',Customer:'MSI Logistics',ShortDesc:'BKK internal',JobType:'4W',Area:'Central Thailand',PickupLocation:'Srinakarin Rd, Nong Bon, Bangkok',PickupProvince:'Bangkok',PickupPostal:'10250',DeliveryLocation:'KUKA Warehouse, Bang Na',DeliveryProvince:'Bangkok',DeliveryPostal:'10260',StartDate:d(0),StartTime:'14:00',EndDate:d(0),EndTime:'18:00',Vehicle:'TH-003 (4W)',Trailer:'',Charge:'900',XRay:'No',CargoType:'Fragile',Remark:'Handle with care',Status:'Pending',ConsolidationGroup:'',CreatedAt:'2026-07-03T08:15:00.000Z',UpdatedAt:'2026-07-03T08:15:00.000Z'},
+    {JobID:'Order26070006',RefNo:'REF-006',Customer:'PTT Chemical',ShortDesc:'Map Ta Phut run',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'PTT Industrial, Map Ta Phut',PickupProvince:'Rayong',PickupPostal:'21150',DeliveryLocation:'Laem Chabang Port Gate 4',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(1),StartTime:'08:00',EndDate:d(1),EndTime:'13:00',Vehicle:'',Trailer:'',Charge:'2800',XRay:'No',CargoType:'Hazmat',Remark:'Class 3 flammable',Status:'Pending',ConsolidationGroup:'',CreatedAt:'2026-07-03T09:00:00.000Z',UpdatedAt:'2026-07-03T09:00:00.000Z'},
+    {JobID:'Order26070007',RefNo:'REF-007',Customer:'Honda Ayutthaya',ShortDesc:'Ayutthaya to BKK',JobType:'10W',Area:'Central Thailand',PickupLocation:'Honda Plant, Ayutthaya',PickupProvince:'Ayutthaya',PickupPostal:'13160',DeliveryLocation:'Bangkok Port, Klong Toey',DeliveryProvince:'Bangkok',DeliveryPostal:'10110',StartDate:d(1),StartTime:'09:00',EndDate:d(1),EndTime:'15:00',Vehicle:'',Trailer:'',Charge:'3500',XRay:'No',CargoType:'Palletized',Remark:'',Status:'Pending',ConsolidationGroup:'',CreatedAt:'2026-07-03T09:30:00.000Z',UpdatedAt:'2026-07-03T09:30:00.000Z'},
+    {JobID:'Order26070008',RefNo:'REF-008',Customer:'Isuzu',ShortDesc:'Gateway to port',JobType:'10W',Area:'Eastern Seaboard',PickupLocation:'Isuzu Gateway, Samut Prakan',PickupProvince:'Samut Prakan',PickupPostal:'10540',DeliveryLocation:'Laem Chabang Port Gate 2',DeliveryProvince:'Chonburi',DeliveryPostal:'20230',StartDate:d(1),StartTime:'08:30',EndDate:d(1),EndTime:'14:00',Vehicle:'',Trailer:'',Charge:'3800',XRay:'No',CargoType:'Auto parts',Remark:'',Status:'Pending',ConsolidationGroup:''}
   ];
 }
 
@@ -593,8 +718,7 @@ function renderAll() {
   try { renderDashboard(); } catch(e) { console.error('dashboard:', e); }
   try { renderJobsTable(); } catch(e) { console.error('jobs:', e); }
   try { renderConsolidation(); } catch(e) { console.error('consolidation:', e); }
-  try { renderDispatch(); } catch(e) { console.error('dispatch:', e); }
-  try { renderReports(); } catch(e) { console.error('reports:', e); }
+  try { if(SESSION&&(SESSION.role==='cs'||SESSION.role==='admin')) renderMyJobs(); } catch(e) { console.error('myjobs:', e); }
   try { renderDropdowns(); } catch(e) { console.error('dropdowns:', e); }
 }
 
@@ -612,19 +736,18 @@ function renderDashboard() {
 
   var todayJobs = JOBS.filter(function(j){return j.StartDate===todayStr;});
   var pending = JOBS.filter(function(j){return j.Status==='Pending';}).length;
-  var transit = JOBS.filter(function(j){return j.Status==='In Transit';}).length;
-  var groups = getConsolidationGroups();
-  var totalCharge = JOBS.reduce(function(s,j){return s+(parseFloat(j.Charge)||0);}, 0);
+  var confirmed = JOBS.filter(function(j){return j.Status==='Confirmed';}).length;
+  var consolidatedTrucks = JOBS.filter(function(j){return j.ConsolidationGroup;}).reduce(function(set,j){set[j.ConsolidationGroup]=1;return set;},{});
+  var consolidatedCount = Object.keys(consolidatedTrucks).length;
 
   var mIcon = function(color, pathD) {
     return '<div class="m-icon" style="background:' + color + '"><svg viewBox="0 0 24 24"><path d="' + pathD + '"/></svg></div>';
   };
   document.getElementById('dash-metrics').innerHTML =
     '<div class="metric">' + mIcon('var(--blue)','M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2') + '<div class="m-lbl">Today\'s jobs</div><div class="m-val" style="color:var(--blue)">' + todayJobs.length + '</div></div>' +
-    '<div class="metric">' + mIcon('var(--amber)','M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z') + '<div class="m-lbl">Pending</div><div class="m-val" style="color:var(--amber)">' + pending + '</div></div>' +
-    '<div class="metric">' + mIcon('var(--purple)','M1 3h15l2 5H1V3zM1 8v8a1 1 0 001 1h1m16 0h1a1 1 0 001-1v-5l-3-3H1') + '<div class="m-lbl">In transit</div><div class="m-val" style="color:var(--purple)">' + transit + '</div></div>' +
-    '<div class="metric">' + mIcon('var(--green)','M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3') + '<div class="m-lbl">Consolidation opps</div><div class="m-val" style="color:var(--green)">' + groups.length + '</div></div>' +
-    '<div class="metric">' + mIcon('#ea7c1e','M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6') + '<div class="m-lbl">Total charges (\u0e3f)</div><div class="m-val" style="color:#ea7c1e;font-size:18px">' + totalCharge.toLocaleString() + '</div></div>';
+    '<div class="metric">' + mIcon('var(--amber)','M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z') + '<div class="m-lbl">Pending (awaiting confirm)</div><div class="m-val" style="color:var(--amber)">' + pending + '</div></div>' +
+    '<div class="metric">' + mIcon('var(--blue)','M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11') + '<div class="m-lbl">Confirmed</div><div class="m-val" style="color:var(--blue)">' + confirmed + '</div></div>' +
+    '<div class="metric">' + mIcon('var(--green)','M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3') + '<div class="m-lbl">Consolidated trucks (all time)</div><div class="m-val" style="color:var(--green)">' + consolidatedCount + '</div></div>';
 
   // Calendar grid
   var firstDay = new Date(calYear, calMonth, 1).getDay();
@@ -648,7 +771,7 @@ function renderDashboard() {
     var dots = '';
     for(var di=0; di<Math.min(dayJobs.length,4); di++) {
       var st = dayJobs[di].Status;
-      var dc = st==='Confirmed'?'orange':st==='In Transit'?'grn':st==='Delivered'?'pur':'';
+      var dc = st==='Confirmed'?'orange':st==='Complete'?'grn':'';
       dots += '<span class="cal-dot ' + dc + '" style="font-size:0">&nbsp;</span>';
     }
     var countTxt = dayJobs.length ? '<div style="font-size:10px;color:var(--gray);margin-top:3px">' + dayJobs.length + ' job' + (dayJobs.length>1?'s':'') + '</div>' : '';
@@ -675,14 +798,31 @@ function openDayModal(dateStr) {
     var html = '';
     for(var i=0; i<dayJobs.length; i++) {
       var j = dayJobs[i];
-      var canDoc = (SESSION.role==='transport'||SESSION.role==='admin') && (j.Status==='Confirmed'||j.Status==='In Transit');
-      var canDel = SESSION.role==='transport'||SESSION.role==='admin';
+      var canDispatch = SESSION.role==='transport'||SESSION.role==='admin';
+      var canDoc = canDispatch && (j.Status==='Confirmed'||j.Status==='Complete');
+      var canDel = canDispatch;
+      var ts = j.UpdatedAt || j.CreatedAt;
+      var tsLabel = '';
+      if(ts) {
+        var dt = new Date(ts);
+        tsLabel = (j.UpdatedAt && j.UpdatedAt !== j.CreatedAt ? 'Edited ' : 'Created ') +
+          dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) + ' ' +
+          dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      }
       html += '<div class="day-job-row">' +
-        '<div style="min-width:90px"><span class="td-id">' + j.JobID + '</span></div>' +
-        '<div style="flex:1"><div style="font-weight:500">' + j.Customer + '</div><div style="font-size:12px;color:var(--gray)">' + j.PickupProvince + ' \u2192 ' + j.DeliveryProvince + '</div></div>' +
+        '<div style="min-width:90px">' +
+          '<span class="td-id">' + j.JobID + '</span>' +
+          (j.CreatedBy ? '<div style="font-size:10px;color:var(--gray);margin-top:2px">' + j.CreatedBy + '</div>' : '') +
+        '</div>' +
+        '<div style="flex:1"><div style="font-weight:500">' + j.Customer + '</div>' +
+          '<div style="font-size:11px;color:var(--gray)">' + j.PickupLocation + ' \u2192 ' + (j.DeliveryLocation||j.DeliveryProvince||'') + '</div>' +
+          (tsLabel ? '<div style="font-size:11px;color:#aaa;margin-top:2px">' + tsLabel + '</div>' : '') +
+        '</div>' +
         '<div style="min-width:60px;font-size:12px;color:var(--gray)">' + j.StartTime + '</div>' +
         '<div>' + badge(j.Status) + '</div>' +
         '<div style="display:flex;gap:5px">' +
+          (canDispatch && j.Status==='Pending' ? '<button class="btn btn-sm btn-primary" data-jid="' + j.JobID + '" data-act="cnf">Confirm</button>' : '') +
+          (canDispatch && j.Status==='Confirmed' ? '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="cmp">Complete</button>' : '') +
           '<button class="btn btn-sm" data-jid="' + j.JobID + '" data-act="edit">Edit</button>' +
           (canDoc ? '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="doc">Doc</button>' : '') +
           (canDel ? '<button class="btn btn-sm btn-red" data-jid="' + j.JobID + '" data-act="del">Delete</button>' : '') +
@@ -697,7 +837,9 @@ function openDayModal(dateStr) {
           var jid = btn.getAttribute('data-jid');
           var act = btn.getAttribute('data-act');
           closeModal('modal-day');
-          if(act==='edit') openJobModal(jid);
+          if(act==='cnf') confirmJob(jid);
+          else if(act==='cmp') completeJob(jid);
+          else if(act==='edit') openJobModal(jid);
           else if(act==='doc') openPDFModal(jid);
           else if(act==='del') deleteJob(jid);
         });
@@ -719,19 +861,25 @@ function renderJobsTable() {
     for(var i=0; i<list.length; i++) {
       var j = list[i];
       var zp = (j.DeliveryPostal||'').slice(0,3)+'xx';
-      var docBtn = (canDispatch && (j.Status==='Confirmed'||j.Status==='In Transit')) ?
+      var cnfBtn = (canDispatch && j.Status==='Pending') ?
+        '<button class="btn btn-sm btn-primary" data-jid="' + j.JobID + '" data-act="cnf">Confirm</button>' : '';
+      var cmpBtn = (canDispatch && j.Status==='Confirmed') ?
+        '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="cmp">Complete</button>' : '';
+      var docBtn = (canDispatch && (j.Status==='Confirmed'||j.Status==='Complete')) ?
         '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="doc">&#x1F4C4; Doc</button>' : '';
       var delBtn = canDispatch ? '<button class="btn btn-sm btn-red" data-jid="' + j.JobID + '" data-act="del">Delete</button>' : '';
+      var ts = j.UpdatedAt || j.CreatedAt || '';
+      var tsStr = '';
+      if(ts) { var dt=new Date(ts); tsStr='<div style="font-size:11px;color:#aaa;margin-top:1px">'+(j.UpdatedAt&&j.UpdatedAt!==j.CreatedAt?'Edited ':'Created ')+dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</div>'; }
       html += '<tr data-jid="' + j.JobID + '">' +
         '<td class="td-id">' + j.JobID + '</td>' +
         '<td class="td-m">' + (j.RefNo||'—') + '</td>' +
-        '<td>' + j.Customer + '</td>' +
-        '<td class="td-m">' + j.PickupProvince + '</td>' +
-        '<td class="td-m">' + j.DeliveryProvince + ' <span class="zp">' + zp + '</span></td>' +
+        '<td>' + j.Customer + tsStr + '</td>' +
+        '<td>' + (j.PickupLocationUrl ? '<a href="'+j.PickupLocationUrl+'" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">Map: '+j.PickupLocation+'</a>' : '<span class="td-m">'+(j.PickupLocation||'—')+'</span>') + '</td>' +
+        '<td class="td-m">' + (j.DeliveryLocation||'—') + '</td>' +
         '<td class="td-m">' + j.StartDate + ' ' + j.StartTime + '</td>' +
-        '<td class="td-m">' + (j.Vehicle||'—') + '</td>' +
         '<td>' + badge(j.Status) + '</td>' +
-        '<td><div style="display:flex;gap:4px">' + docBtn + delBtn + '</div></td>' +
+        '<td><div style="display:flex;gap:4px">' + cnfBtn + cmpBtn + docBtn + delBtn + '</div></td>' +
       '</tr>';
     }
   }
@@ -750,7 +898,9 @@ function renderJobsTable() {
             e.stopPropagation();
             var jid = btn.getAttribute('data-jid');
             var act = btn.getAttribute('data-act');
-            if(act==='doc') openPDFModal(jid);
+            if(act==='cnf') confirmJob(jid);
+            else if(act==='cmp') completeJob(jid);
+            else if(act==='doc') openPDFModal(jid);
             else if(act==='del') deleteJob(jid);
           });
         })(btns[bi]);
@@ -770,47 +920,61 @@ function populateDDSelect(id, key, blank) {
 
 function openJobModal(jobId) {
   editingJobId = jobId || null;
-  populateDDSelect('j-jobtype','Job Type',null);
-  populateDDSelect('j-area','Transportation Area','-- Select --');
-  populateDDSelect('j-vehicle','Vehicle','Not specify');
-  populateDDSelect('j-trailer','Trailer','Not specify');
-  populateDDSelect('j-pickup-prov','Province','-- Select --');
-  populateDDSelect('j-deliv-prov','Province','-- Select --');
-  populateDDSelect('j-cargo-type','Cargo Type',null);
+  // Job Type now handled per-truck row via populateTruckTypeSelects()
+  populateDDSelect('j-cargo-type-left','Cargo Type',null);
+  populateTruckTypeSelects();
   var custDL = document.getElementById('customer-list');
   if(custDL) { var ch=''; (DROPDOWNS['Customer']||[]).forEach(function(c){ch+='<option value="'+c+'">';}); custDL.innerHTML=ch; }
-  var locDL = document.getElementById('location-list');
+  var locDL = document.getElementById('saved-locations-list');
   if(locDL) {
-    var locs = {};
-    JOBS.forEach(function(j){ if(j.PickupLocation) locs[j.PickupLocation]=1; if(j.DeliveryLocation) locs[j.DeliveryLocation]=1; });
-    var lh=''; Object.keys(locs).forEach(function(l){lh+='<option value="'+l+'">';}); locDL.innerHTML=lh;
+    var lh='';
+    LOCATIONS.forEach(function(loc){ lh+='<option value="'+loc.name+'">'; });
+    locDL.innerHTML=lh;
   }
   var today = new Date().toISOString().split('T')[0];
   if(!jobId) {
     document.getElementById('mj-title').textContent = 'Manage Job \u00bb Add';
+    var cbEl2 = document.getElementById('mj-created-by'); if(cbEl2) cbEl2.textContent = '';
     sv('j-qty','1'); sv('j-ref',''); sv('j-desc',''); sv('j-customer','');
     sv('j-start-date',today); sv('j-start-time','09:00');
     sv('j-end-date',''); sv('j-end-time','');
     sv('j-pickup',''); document.getElementById('delivery-points').innerHTML='';
-    sv('j-charge',''); sv('j-xray','Yes'); sv('j-remark','');
-    sv('j-pickup-postal',''); sv('j-deliv-postal',''); sv('j-pieces','');
+    sv('j-pickup-manual',''); sv('j-pickup-contact',''); sv('j-delivery-contact','');
+    sv('j-xray','Yes'); sv('j-remark','');
+    sv('j-return-point',''); sv('j-return-contact','');
+    var rml=document.getElementById('j-return-map-link'); if(rml) rml.innerHTML='';
+    resetTruckRows();
+    sv('j-dimensions',''); sv('j-kgs','');
+    document.getElementById('delivery-points').innerHTML='';
+    var ml=document.getElementById('j-pickup-map-link'); if(ml) ml.innerHTML='';
+    resetUploadSlots();
   } else {
     var j = JOBS.find(function(x){return x.JobID===jobId;});
     if(!j) return;
     document.getElementById('mj-title').textContent = 'Manage Job \u00bb Edit \u2014 ' + j.JobID;
+    var cbEl = document.getElementById('mj-created-by');
+    if(cbEl) cbEl.textContent = j.CreatedBy ? 'Created by: ' + j.CreatedBy : '';
     sv('j-ref', j.RefNo); sv('j-desc', j.ShortDesc); sv('j-customer', j.Customer);
     sv('j-start-date', j.StartDate); sv('j-start-time', j.StartTime);
     sv('j-end-date', j.EndDate); sv('j-end-time', j.EndTime);
     sv('j-pickup', j.PickupLocation);
-    document.getElementById('delivery-points').innerHTML = j.DeliveryLocation ?
-      '<div style="font-size:12px;color:var(--gray);margin-top:4px">\u2192 ' + j.DeliveryLocation + '</div>' : '';
-    sv('j-charge', j.Charge); sv('j-xray', j.XRay||'Yes'); sv('j-remark', j.Remark);
-    sv('j-pickup-postal', j.PickupPostal); sv('j-deliv-postal', j.DeliveryPostal); sv('j-pieces', j.Pieces);
+    sv('j-pickup-manual', j.PickupLocation);
+    sv('j-pickup-contact', j.PickupContact);
+    sv('j-delivery-contact', j.DeliveryContact);
+    document.getElementById('delivery-points').innerHTML = '';
+    sv('j-xray', j.XRay||'Yes'); sv('j-remark', j.Remark);
+    sv('j-return-point', j.ReturnPoint); sv('j-return-contact', j.ReturnContact);
+    loadTruckRows(j.Trucks);
+    sv('j-dimensions', j.Dimensions); sv('j-kgs', j.KGS);
+    resetUploadSlots();
+    restoreUploadedFiles(j);
     setTimeout(function() {
-      sv('j-jobtype', j.JobType); sv('j-area', j.Area);
-      sv('j-vehicle', j.Vehicle); sv('j-trailer', j.Trailer);
-      sv('j-pickup-prov', j.PickupProvince); sv('j-deliv-prov', j.DeliveryProvince);
-      sv('j-cargo-type', j.CargoType);
+      sv('j-cargo-type-left', j.CargoType);
+      var ml2=document.getElementById('j-pickup-map-link');
+      if(ml2&&j.PickupLocationUrl){ml2.innerHTML='<a href="'+j.PickupLocationUrl+'" target="_blank" style="font-size:12px;color:var(--blue)">Map link</a>';}
+      var dp2=document.getElementById('delivery-points'); dp2.innerHTML='';
+      if(j.DeliveryPoints&&j.DeliveryPoints.length){ j.DeliveryPoints.forEach(function(pt){ addDeliveryPointWithVal(pt.name); }); }
+      else if(j.DeliveryLocation){ addDeliveryPointWithVal(j.DeliveryLocation); }
     }, 50);
   }
   openModal('modal-job');
@@ -818,52 +982,80 @@ function openJobModal(jobId) {
 
 function saveJob() {
   if(!gv('j-customer') || !gv('j-start-date')) { toast('Customer and Start Date are required'); return; }
-  var delPts = document.querySelectorAll('#delivery-points input');
-  var delivLoc = delPts.length ? delPts[0].value.trim() : gv('j-deliv-postal');
   var payload = {
     action:'saveJob', jobId: editingJobId,
     refNo:gv('j-ref'), shortDesc:gv('j-desc'), customer:gv('j-customer'),
-    jobType:gv('j-jobtype'), area:gv('j-area'),
+    trucks:collectTruckRows(),
+    jobType:(function(){ var t=collectTruckRows(); return t.length?t[0].type:''; })(),
     startDate:gv('j-start-date'), startTime:gv('j-start-time'),
     endDate:gv('j-end-date'), endTime:gv('j-end-time'),
-    pickupLocation:gv('j-pickup'), deliveryLocation: delivLoc,
-    vehicle:gv('j-vehicle'), trailer:gv('j-trailer'),
-    charge:gv('j-charge'), xray:gv('j-xray'), remark:gv('j-remark'),
-    pickupProvince:gv('j-pickup-prov'), pickupPostal:gv('j-pickup-postal'),
-    deliveryProvince:gv('j-deliv-prov'), deliveryPostal:gv('j-deliv-postal'),
-    pieces:gv('j-pieces'), cargoType:gv('j-cargo-type'),
+    pickupLocation: gv('j-pickup-manual'),
+    pickupLocationUrl: (function(){ var match=LOCATIONS.find(function(l){return l.name===gv('j-pickup-manual');}); return match?match.url:''; })(),
+    pickupContact: gv('j-pickup-contact'),
+    deliveryContact: gv('j-delivery-contact'),
+    returnPoint: gv('j-return-point'),
+    returnContact: gv('j-return-contact'),
+    deliveryPoints:(function(){
+      var pts=[]; var rows=document.querySelectorAll('#delivery-points .dp-row input');
+      rows.forEach(function(inp){ var val=inp.value.trim(); if(!val) return;
+        var match=LOCATIONS.find(function(l){return l.name===val;});
+        pts.push({name:val, url:match?match.url:'', address:match?match.address:''});
+      }); return pts;
+    })(),
+    deliveryLocation:(function(){ var rows=document.querySelectorAll('#delivery-points .dp-row input');
+      if(!rows.length || !rows[0].value.trim()) return ''; return rows[0].value.trim();
+    })(),
+    xray:gv('j-xray'), remark:gv('j-remark'),
+    amount:(function(){ var t=collectTruckRows(); return t.length?t[0].amount:''; })(),
+    driverDetails:(function(){ var t=collectTruckRows(); return t.map(function(t){return t.driver;}).filter(Boolean).join(' | '); })(),
+    dimensions:gv('j-dimensions'), kgs:gv('j-kgs'),
+    cargoType:gv('j-cargo-type-left'),
+    uploadedFiles: UPLOADED_FILES,
     createdBy: SESSION.username
   };
   if(editingJobId) {
     var idx = JOBS.findIndex(function(j){return j.JobID===editingJobId;});
     if(idx>=0) Object.assign(JOBS[idx], {
       RefNo:payload.refNo, Customer:payload.customer, ShortDesc:payload.shortDesc,
-      JobType:payload.jobType, Area:payload.area,
+      JobType:payload.jobType,
       StartDate:payload.startDate, StartTime:payload.startTime,
       EndDate:payload.endDate, EndTime:payload.endTime,
-      PickupLocation:payload.pickupLocation, DeliveryLocation:payload.deliveryLocation,
-      PickupProvince:payload.pickupProvince, PickupPostal:payload.pickupPostal,
-      DeliveryProvince:payload.deliveryProvince, DeliveryPostal:payload.deliveryPostal,
-      Vehicle:payload.vehicle, Trailer:payload.trailer,
-      Charge:payload.charge, XRay:payload.xray, Pieces:payload.pieces,
-      CargoType:payload.cargoType, Remark:payload.remark
+      PickupLocation:payload.pickupLocation, PickupLocationUrl:payload.pickupLocationUrl,
+      PickupContact:payload.pickupContact, DeliveryContact:payload.deliveryContact,
+      ReturnPoint:payload.returnPoint, ReturnContact:payload.returnContact,
+      DeliveryPoints:payload.deliveryPoints, DeliveryLocation:payload.deliveryLocation,
+      XRay:payload.xray, Remark:payload.remark,
+      Trucks:payload.trucks, Amount:payload.amount, DriverDetails:payload.driverDetails,
+      Dimensions:payload.dimensions, KGS:payload.kgs,
+      CargoType:payload.cargoType,
+      UploadedFiles:payload.uploadedFiles,
+      UpdatedAt:(new Date()).toISOString()
     });
     if(API_URL) apiCall(payload, function(){});
     closeModal('modal-job'); toast('Updated ' + editingJobId); renderAll();
   } else {
-    var newId = 'TMS-' + String(JOBS.length+1).padStart(3,'0');
+    var now = new Date();
+    var yy = String(now.getFullYear()).slice(2);
+    var mm = String(now.getMonth()+1).padStart(2,'0');
+    var prefix = 'Order' + yy + mm;
+    var sameMonth = JOBS.filter(function(j){ return j.JobID && j.JobID.indexOf(prefix)===0; }).length;
+    var newId = prefix + String(sameMonth+1).padStart(4,'0');
     var newJob = {
       JobID:newId, RefNo:payload.refNo, Customer:payload.customer, ShortDesc:payload.shortDesc,
-      JobType:payload.jobType, Area:payload.area,
+      JobType:payload.jobType,
       StartDate:payload.startDate, StartTime:payload.startTime,
       EndDate:payload.endDate, EndTime:payload.endTime,
-      PickupLocation:payload.pickupLocation, DeliveryLocation:payload.deliveryLocation,
-      PickupProvince:payload.pickupProvince, PickupPostal:payload.pickupPostal,
-      DeliveryProvince:payload.deliveryProvince, DeliveryPostal:payload.deliveryPostal,
-      Vehicle:payload.vehicle, Trailer:payload.trailer,
-      Charge:payload.charge, XRay:payload.xray, Pieces:payload.pieces,
-      CargoType:payload.cargoType, Remark:payload.remark,
-      Status:'Pending', ConsolidationGroup:''
+      PickupLocation:payload.pickupLocation, PickupLocationUrl:payload.pickupLocationUrl,
+      PickupContact:payload.pickupContact, DeliveryContact:payload.deliveryContact,
+      ReturnPoint:payload.returnPoint, ReturnContact:payload.returnContact,
+      DeliveryPoints:payload.deliveryPoints, DeliveryLocation:payload.deliveryLocation,
+      XRay:payload.xray, Remark:payload.remark,
+      Trucks:payload.trucks, Amount:payload.amount, DriverDetails:payload.driverDetails,
+      Dimensions:payload.dimensions, KGS:payload.kgs,
+      CargoType:payload.cargoType, UploadedFiles:payload.uploadedFiles,
+      Status:'Pending', ConsolidationGroup:'',
+      CreatedBy:SESSION.username,
+      CreatedAt:(new Date()).toISOString(), UpdatedAt:(new Date()).toISOString()
     };
     JOBS.push(newJob);
     if(API_URL) apiCall(payload, function(r){ if(r&&r.jobId) newJob.JobID=r.jobId; });
@@ -979,38 +1171,11 @@ function confirmConsolidation(idx) {
   var groups = getConsolidationGroups();
   if(!groups[idx]) return;
   var grp = groups[idx].jobs;
-  grp.forEach(function(j) { var job=JOBS.find(function(x){return x.JobID===j.JobID;}); if(job&&job.Status==='Pending') job.Status='Confirmed'; });
-  if(API_URL) apiCall({action:'saveConsolidation',groupId:'CON-'+Date.now(),jobIds:grp.map(function(j){return j.JobID;}),deliveryProvince:grp[0].DeliveryProvince,date:grp[0].StartDate,confirmedBy:SESSION.username}, function(){});
+  var groupId = 'CON-' + Date.now();
+  grp.forEach(function(j) { var job=JOBS.find(function(x){return x.JobID===j.JobID;}); if(job){ if(job.Status==='Pending') job.Status='Confirmed'; job.ConsolidationGroup=groupId; } });
+  if(API_URL) apiCall({action:'saveConsolidation',groupId:groupId,jobIds:grp.map(function(j){return j.JobID;}),deliveryProvince:grp[0].DeliveryProvince,date:grp[0].StartDate,confirmedBy:SESSION.username}, function(){});
   toast('Consolidated ' + grp.length + ' jobs \u2014 same truck assigned');
   renderAll();
-}
-
-// ── DISPATCH ───────────────────────────────────────────
-function renderDispatch() {
-  var list = JOBS.filter(function(j){return j.Status==='Confirmed'||j.Status==='In Transit';});
-  var html = '';
-  if(!list.length) {
-    html = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--gray)">No jobs ready to dispatch.</td></tr>';
-  } else {
-    for(var i=0; i<list.length; i++) {
-      var j = list[i];
-      html += '<tr>' +
-        '<td class="td-id">' + j.JobID + '</td><td>' + j.Customer + '</td>' +
-        '<td class="td-m">' + j.PickupProvince + '</td><td class="td-m">' + j.DeliveryProvince + '</td>' +
-        '<td class="td-m">' + j.StartDate + ' ' + j.StartTime + '</td>' +
-        '<td>' + badge(j.Status) + '</td>' +
-        '<td><button class="btn btn-sm btn-green" data-jid="' + j.JobID + '">&#x1F4C4; Generate</button></td>' +
-      '</tr>';
-    }
-  }
-
-  document.getElementById('dispatch-tbody').innerHTML = html;
-  var btns = document.querySelectorAll('#dispatch-tbody button[data-jid]');
-  for(var bi=0; bi<btns.length; bi++) {
-    (function(btn) {
-      btn.addEventListener('click', function() { openPDFModal(btn.getAttribute('data-jid')); });
-    })(btns[bi]);
-  }
 }
 
 // -- DROPDOWNS --
@@ -1048,33 +1213,118 @@ function renderDropdowns() {
   }
 }
 
-// -- REPORTS --
-function renderReports() {
-  var total=JOBS.length, delivered=JOBS.filter(function(j){return j.Status==='Delivered';}).length;
-  var groups=getConsolidationGroups().length;
-  var rev=JOBS.reduce(function(s,j){return s+(parseFloat(j.Charge)||0);},0);
-  document.getElementById('report-metrics').innerHTML =
-    '<div class="metric"><div class="m-icon" style="background:var(--blue)"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="m-lbl">Total jobs</div><div class="m-val" style="color:var(--blue)">' + total + '</div></div>' +
-    '<div class="metric"><div class="m-icon" style="background:var(--green)"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div class="m-lbl">Delivered</div><div class="m-val" style="color:var(--green)">' + delivered + '</div></div>' +
-    '<div class="metric"><div class="m-icon" style="background:var(--purple)"><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/></svg></div><div class="m-lbl">Consolidation opps</div><div class="m-val" style="color:var(--purple)">' + groups + '</div></div>' +
-    '<div class="metric"><div class="m-icon" style="background:#ea7c1e"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div><div class="m-lbl">Revenue (฿)</div><div class="m-val" style="color:#ea7c1e;font-size:18px">' + rev.toLocaleString() + '</div></div>' +
-    '<div class="metric"><div class="m-icon" style="background:var(--navy)"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/></svg></div><div class="m-lbl">AI est. saving (฿)</div><div class="m-val" style="color:var(--navy);font-size:18px">' + (groups*1800).toLocaleString() + '</div></div>';
-  var counts={};
-  JOBS.forEach(function(j){counts[j.DeliveryProvince]=(counts[j.DeliveryProvince]||0)+1;});
-  var sorted=Object.keys(counts).map(function(k){return [k,counts[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
-  var max=sorted.length?sorted[0][1]:1;
-  var barsHtml='';
-  sorted.forEach(function(pair){barsHtml+='<div class="bar-row"><div class="bar-lbl">'+pair[0]+'</div><div class="bar-track"><div class="bar-fill" style="width:'+Math.round(pair[1]/max*100)+'%"><span>'+pair[1]+'</span></div></div></div>';});
-  document.getElementById('zone-chart').innerHTML = barsHtml || '<p style="color:var(--gray)">No data.</p>';
+// -- USERS STORE (browser-side until Google Sheets is connected) --
+var USERS = safeJSON('tms_users', [
+  {username:'wapat',   password:'wapat2024',   role:'cs',         fullName:'Wapat S.',    email:'',  active:true},
+  {username:'somchai', password:'somchai2024', role:'transport',  fullName:'Somchai T.',  email:'',  active:true},
+  {username:'admin',   password:'admin2024',   role:'admin',      fullName:'Admin',       email:'',  active:true},
+  {username:'diskorn', password:'diskorn2024', role:'management', fullName:'Khun Diskorn',email:'',  active:true}
+]);
+function saveUsers(){ localStorage.setItem('tms_users', JSON.stringify(USERS)); }
+
+// Patch doLogin to use USERS store
+function doLogin() {
+  var u = document.getElementById('lu').value.trim();
+  var p = document.getElementById('lp').value.trim();
+  var err = document.getElementById('lerr');
+  err.style.display = 'none';
+  if(!u || !p) { err.textContent = 'Please enter username and password.'; err.style.display = 'block'; return; }
+  var match = USERS.find(function(usr){ return usr.username===u && usr.password===p && usr.active; });
+  if(!match) { err.textContent = 'Invalid username or password.'; err.style.display = 'block'; return; }
+  SESSION = {role:match.role, fullName:match.fullName, username:match.username, email:match.email||''};
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  try{ applyRole(); }  catch(e){ console.error('applyRole:', e); }
+  try{ loadAll(); }    catch(e){ console.error('loadAll:', e); }
 }
 
-// -- ADMIN --
+// -- ADMIN PAGE --
+var editingUserId = null;
+
 function renderAdmin() {
-  document.getElementById('users-tbody').innerHTML =
-    '<tr><td>Wapat S.</td><td>wapat</td><td><span class="badge b-confirmed">Customer Service</span></td><td><span class="badge b-delivered">Active</span></td></tr>' +
-    '<tr><td>Somchai T.</td><td>somchai</td><td><span class="badge b-transit">Transport</span></td><td><span class="badge b-delivered">Active</span></td></tr>' +
-    '<tr><td>Admin</td><td>admin</td><td><span class="badge b-pending">Admin</span></td><td><span class="badge b-delivered">Active</span></td></tr>' +
-    '<tr><td>Khun Diskorn</td><td>diskorn</td><td><span class="badge" style="background:var(--gray-l);color:var(--gray)">Management</span></td><td><span class="badge b-delivered">Active</span></td></tr>';
+  var html = '';
+  if(!USERS.length) {
+    html = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray)">No users yet.</td></tr>';
+  } else {
+    var roleLabels = {cs:'Customer Service', transport:'Transport', admin:'Admin', management:'Management'};
+    var roleBadge  = {cs:'b-confirmed', transport:'b-transit', admin:'b-pending', management:'b-delivered'};
+    USERS.forEach(function(u, i) {
+      html += '<tr>' +
+        '<td style="font-weight:500">' + u.fullName + '</td>' +
+        '<td class="td-m">' + u.username + '</td>' +
+        '<td><span class="badge '+(roleBadge[u.role]||'b-pending')+'">'+(roleLabels[u.role]||u.role)+'</span></td>' +
+        '<td class="td-m">' + (u.email||'<span style="color:#ccc">—</span>') + '</td>' +
+        '<td><span class="badge '+(u.active?'b-delivered':'b-pending')+'">'+(u.active?'Active':'Inactive')+'</span></td>' +
+        '<td><button class="btn btn-sm" data-uidx="'+i+'" data-act="edit-user">Edit</button></td>' +
+      '</tr>';
+    });
+  }
+  document.getElementById('users-tbody').innerHTML = html;
+  document.querySelectorAll('#users-tbody button[data-act]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      openUserModal(parseInt(btn.getAttribute('data-uidx')));
+    });
+  });
+}
+
+function openUserModal(idx) {
+  editingUserId = (idx !== undefined && idx !== null) ? idx : null;
+  var isNew = editingUserId === null;
+  document.getElementById('user-modal-title').textContent = isNew ? 'Add User' : 'Edit User';
+  document.getElementById('btn-delete-user').style.display = isNew ? 'none' : '';
+  if(isNew) {
+    document.getElementById('u-fullname').value = '';
+    document.getElementById('u-username').value = '';
+    document.getElementById('u-password').value = '';
+    document.getElementById('u-role').value = 'cs';
+    document.getElementById('u-email').value = '';
+    document.getElementById('u-active').value = 'true';
+  } else {
+    var u = USERS[editingUserId];
+    document.getElementById('u-fullname').value = u.fullName || '';
+    document.getElementById('u-username').value = u.username || '';
+    document.getElementById('u-password').value = '';
+    document.getElementById('u-role').value = u.role || 'cs';
+    document.getElementById('u-email').value = u.email || '';
+    document.getElementById('u-active').value = u.active ? 'true' : 'false';
+  }
+  openModal('modal-user');
+}
+
+function saveUser() {
+  var fullName = document.getElementById('u-fullname').value.trim();
+  var username = document.getElementById('u-username').value.trim();
+  var password = document.getElementById('u-password').value.trim();
+  var role     = document.getElementById('u-role').value;
+  var email    = document.getElementById('u-email').value.trim();
+  var active   = document.getElementById('u-active').value === 'true';
+  if(!fullName || !username) { toast('Full name and username are required'); return; }
+  if(editingUserId === null && !password) { toast('Password is required for new users'); return; }
+  // Check duplicate username
+  var dupIdx = USERS.findIndex(function(u, i){ return u.username===username && i!==editingUserId; });
+  if(dupIdx >= 0) { toast('Username already exists'); return; }
+  if(editingUserId === null) {
+    USERS.push({username:username, password:password, role:role, fullName:fullName, email:email, active:active});
+  } else {
+    var u = USERS[editingUserId];
+    u.fullName = fullName; u.username = username; u.role = role; u.email = email; u.active = active;
+    if(password) u.password = password;
+  }
+  saveUsers();
+  if(API_URL) apiCall({action:'saveUser', user:{username:username, password:password, role:role, fullName:fullName, email:email, active:active}, updatedBy:SESSION.username}, function(){});
+  closeModal('modal-user'); renderAdmin();
+  toast((editingUserId===null?'User added: ':'User updated: ') + fullName);
+}
+
+function deleteUser() {
+  if(editingUserId === null) return;
+  var u = USERS[editingUserId];
+  if(!confirm('Delete user "' + u.fullName + '"? This cannot be undone.')) return;
+  if(u.username === SESSION.username) { toast('You cannot delete your own account'); return; }
+  USERS.splice(editingUserId, 1);
+  saveUsers();
+  closeModal('modal-user'); renderAdmin();
+  toast('User deleted');
 }
 
 // -- PDF --
@@ -1130,8 +1380,8 @@ function saveAPIUrl() {
   var res = document.getElementById('conn-res');
   res.textContent='Testing...'; res.style.color='var(--gray)';
   apiCall({action:'getJobs'},function(r){
-    if(r&&r.ok){res.textContent='✓ Connected — '+r.jobs.length+' jobs';res.style.color='var(--green)';JOBS=r.jobs;setApiStatus(true);renderAll();}
-    else{res.textContent='✗ '+(r?r.error:'Failed');res.style.color='var(--red)';setApiStatus(false);}
+    if(r&&r.ok){res.textContent='\u2713 Connected \u2014 '+r.jobs.length+' jobs';res.style.color='var(--green)';JOBS=r.jobs;setApiStatus(true);renderAll();}
+    else{res.textContent='\u2717 '+(r?r.error:'Failed');res.style.color='var(--red)';setApiStatus(false);}
   });
 }
 
@@ -1161,11 +1411,345 @@ function goto(page) {
   var nv=document.getElementById('nav-'+page); if(nv) nv.classList.add('active');
   if(page==='jobs') renderJobsTable();
   if(page==='consolidate') renderConsolidation();
-  if(page==='dispatch') renderDispatch();
-  if(page==='reports') renderReports();
   if(page==='admin') renderAdmin();
   if(page==='dropdowns') renderDropdowns();
   if(page==='dashboard') renderDashboard();
+  if(page==='locations') renderLocationsPage();
+  if(page==='myjobs') renderMyJobs();
+}
+
+// -- CONFIRM JOB (Transport team) --
+function confirmJob(jobId) {
+  var job = JOBS.find(function(j){ return j.JobID===jobId; });
+  if(!job) return;
+  if(job.Status !== 'Pending') { toast(jobId + ' is already ' + job.Status); return; }
+  if(!confirm('Confirm job ' + jobId + '? Status will change from Pending to Confirmed.')) return;
+  job.Status = 'Confirmed';
+  job.UpdatedAt = new Date().toISOString();
+  if(API_URL) apiCall({action:'updateStatus', jobId:jobId, status:'Confirmed', updatedBy:SESSION.username}, function(){});
+  sendConfirmNotification(job);
+  toast(jobId + ' confirmed');
+  renderAll();
+}
+
+function completeJob(jobId) {
+  var job = JOBS.find(function(j){ return j.JobID===jobId; });
+  if(!job) return;
+  if(job.Status !== 'Confirmed') { toast(jobId + ' must be Confirmed before completing'); return; }
+  if(!confirm('Mark job ' + jobId + ' as Complete?')) return;
+  job.Status = 'Complete';
+  job.UpdatedAt = new Date().toISOString();
+  if(API_URL) apiCall({action:'updateStatus', jobId:jobId, status:'Complete', updatedBy:SESSION.username}, function(){});
+  toast(jobId + ' marked Complete');
+  renderAll();
+}
+
+// -- PDF UPLOAD & AUTO-FILL --
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+function resetUploadSlots() {
+  UPLOADED_FILES = {additional:null};
+  ['additional'].forEach(function(slot){
+    var statusEl = document.getElementById('status-' + slot);
+    if(statusEl) statusEl.textContent = '';
+    var inputEl = document.getElementById('upload-' + slot);
+    if(inputEl) inputEl.value = '';
+  });
+}
+
+function restoreUploadedFiles(job) {
+  if(!job.UploadedFiles) return;
+  UPLOADED_FILES = job.UploadedFiles;
+  ['additional'].forEach(function(slot){
+    var statusEl = document.getElementById('status-' + slot);
+    if(statusEl && UPLOADED_FILES[slot]) statusEl.textContent = '\u2713 ' + UPLOADED_FILES[slot].fileName;
+  });
+}
+
+function extractTextFromPDF(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var typedArray = new Uint8Array(e.target.result);
+    if(typeof pdfjsLib === 'undefined') { callback(''); return; }
+    pdfjsLib.getDocument({data: typedArray}).promise.then(function(pdf) {
+      var pagePromises = [];
+      for(var i=1; i<=pdf.numPages; i++) {
+        pagePromises.push(pdf.getPage(i).then(function(page){
+          return page.getTextContent().then(function(tc){
+            return tc.items.map(function(it){return it.str;}).join(' ');
+          });
+        }));
+      }
+      Promise.all(pagePromises).then(function(texts){ callback(texts.join('\n')); });
+    }).catch(function(err){ console.error('PDF read error:', err); callback(''); });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Parse common shipping-document fields out of raw PDF text
+function parseShippingText(text) {
+  var f = {};
+  var dateMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
+  if(dateMatch) f.date = dateMatch[1];
+
+  var refMatch = text.match(/(?:Ref\.?\s*No\.?|Reference|Job\s*No\.?)[:\s]+([A-Za-z0-9\/\-]+)/i);
+  if(refMatch) f.refNo = refMatch[1];
+
+  var custMatch = text.match(/(?:Customer|Shipper|Consignee)[:\s]+([^\n]{3,60})/i);
+  if(custMatch) f.customer = custMatch[1].trim();
+
+  var pickupMatch = text.match(/(?:Pick\s*up|Origin|From|Place of Pick up)[:\s]+([^\n]{3,80})/i);
+  if(pickupMatch) f.pickup = pickupMatch[1].trim();
+
+  var deliveryMatch = text.match(/(?:Deliver(?:y)?|Destination|To|Place of Delivery)[:\s]+([^\n]{3,80})/i);
+  if(deliveryMatch) f.delivery = deliveryMatch[1].trim();
+
+  var weightMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kg|KG|Kgs)/i);
+  if(weightMatch) f.weight = weightMatch[1];
+
+  var piecesMatch = text.match(/(\d+)\s*(?:pcs|Pieces|PKGS|packages)/i);
+  if(piecesMatch) f.pieces = piecesMatch[1];
+
+  var contactMatch = text.match(/(?:Contact|Attn|Tel)[:\s]+([^\n]{3,50})/i);
+  if(contactMatch) f.contact = contactMatch[1].trim();
+
+  return f;
+}
+
+function applyParsedFieldsToForm(fields) {
+  var applied = [];
+  if(fields.refNo && !gv('j-ref')) { sv('j-ref', fields.refNo); applied.push('Ref no.'); }
+  if(fields.customer && !gv('j-customer')) { sv('j-customer', fields.customer); applied.push('Customer'); }
+  if(fields.date && !gv('j-start-date')) {
+    var parts = fields.date.split(/[\/\-]/);
+    if(parts.length===3) {
+      var y = parts[2].length===2 ? '20'+parts[2] : parts[2];
+      var iso = y + '-' + parts[1].padStart(2,'0') + '-' + parts[0].padStart(2,'0');
+      sv('j-start-date', iso); applied.push('Start Date');
+    }
+  }
+  if(fields.pickup && !gv('j-pickup-manual')) { sv('j-pickup-manual', fields.pickup); applied.push('Pickup Point'); }
+  if(fields.delivery) {
+    var dpRows = document.querySelectorAll('#delivery-points .dp-row');
+    if(!dpRows.length) {
+      addDeliveryPointWithVal(fields.delivery);
+      applied.push('Delivery Point');
+    }
+  }
+  if(fields.weight && !gv('j-kgs')) { sv('j-kgs', fields.weight); applied.push('KGS'); }
+  if(fields.pieces && !gv('j-kgs')) { sv('j-kgs', fields.pieces); applied.push('KGS'); }
+  if(fields.contact && !gv('j-pickup-contact')) { sv('j-pickup-contact', fields.contact); applied.push('Contact person pickup'); }
+  return applied;
+}
+
+function handleUploadSlot(slot, file) {
+  var statusEl = document.getElementById('status-' + slot);
+  statusEl.textContent = 'Reading...';
+  extractTextFromPDF(file, function(text) {
+    var fields = parseShippingText(text);
+    UPLOADED_FILES[slot] = {fileName: file.name, rawText: text.slice(0,2000), parsedFields: fields};
+    statusEl.textContent = '\u2713 ' + file.name;
+    var applied = applyParsedFieldsToForm(fields);
+    if(applied.length) toast('Auto-filled from ' + file.name + ': ' + applied.join(', '));
+    else toast(file.name + ' uploaded — no matching fields found to auto-fill');
+  });
+}
+
+['air','sea','ot','additional'].forEach(function(slot){
+  var btn = document.getElementById('btn-upload-' + slot);
+  var input = document.getElementById('upload-' + slot);
+  if(btn && input) {
+    btn.addEventListener('click', function(){ input.click(); });
+    input.addEventListener('change', function(){
+      if(this.files && this.files[0]) handleUploadSlot(slot, this.files[0]);
+    });
+  }
+});
+
+// -- MY JOBS PAGE --
+function renderMyJobs() {
+  var user = SESSION.username;
+  var filter = document.getElementById('myjobs-filter') ? document.getElementById('myjobs-filter').value : '';
+  // CS sees their own jobs; admin sees all
+  var myJobs = SESSION.role === 'admin'
+    ? JOBS.slice()
+    : JOBS.filter(function(j){ return j.CreatedBy === user; });
+  if(filter) myJobs = myJobs.filter(function(j){ return j.Status === filter; });
+
+  var sub = document.getElementById('myjobs-sub');
+  if(sub) sub.textContent = SESSION.role==='admin' ? 'All job orders' : 'Jobs submitted by ' + SESSION.fullName;
+
+  var titleEl = document.getElementById('myjobs-card-title');
+  if(titleEl) titleEl.textContent = 'Job Orders (' + myJobs.length + ')';
+
+  // Metrics
+  var pending   = myJobs.filter(function(j){return j.Status==='Pending';}).length;
+  var confirmed = myJobs.filter(function(j){return j.Status==='Confirmed';}).length;
+  var complete  = myJobs.filter(function(j){return j.Status==='Complete';}).length;
+  var mDiv = document.getElementById('myjobs-metrics');
+  if(mDiv) {
+    mDiv.innerHTML =
+      '<div class="metric"><div class="m-icon" style="background:var(--amber)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="m-lbl">Pending</div><div class="m-val" style="color:var(--amber)">' + pending + '</div></div>' +
+      '<div class="metric"><div class="m-icon" style="background:var(--blue)"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div><div class="m-lbl">Confirmed</div><div class="m-val" style="color:var(--blue)">' + confirmed + '</div></div>' +
+      '<div class="metric"><div class="m-icon" style="background:var(--green)"><svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div><div class="m-lbl">Complete</div><div class="m-val" style="color:var(--green)">' + complete + '</div></div>';
+  }
+
+  // Progress bar helper
+  function progressBar(status) {
+    var steps = ['Pending','Confirmed','Complete'];
+    var idx = steps.indexOf(status);
+    var colors = ['var(--amber)','var(--blue)','var(--green)'];
+    var pct = idx === 0 ? 15 : idx === 1 ? 55 : 100;
+    var col = colors[Math.max(0,idx)];
+    return '<div style="display:flex;align-items:center;gap:6px;min-width:120px">' +
+      '<div style="flex:1;height:6px;background:var(--gray-l);border-radius:3px;overflow:hidden">' +
+        '<div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:3px;transition:width .3s"></div>' +
+      '</div>' +
+      '<span style="font-size:11px;color:'+col+';font-weight:600;white-space:nowrap">'+status+'</span>' +
+    '</div>';
+  }
+
+  var html = '';
+  if(!myJobs.length) {
+    html = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--gray)">No jobs found' + (SESSION.role!=='admin'?' for your account':'') + '.</td></tr>';
+  } else {
+    myJobs.forEach(function(j) {
+      var ts = j.UpdatedAt || j.CreatedAt || '';
+      var tsStr = '';
+      if(ts) { var dt=new Date(ts); tsStr='<div style="font-size:11px;color:#aaa;margin-top:1px">'+(j.UpdatedAt&&j.UpdatedAt!==j.CreatedAt?'Edited ':'Created ')+dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' '+dt.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</div>'; }
+      html += '<tr data-jid="' + j.JobID + '">' +
+        '<td class="td-id">' + j.JobID + '</td>' +
+        '<td class="td-m">' + (j.RefNo||'—') + '</td>' +
+        '<td>' + j.Customer + tsStr + '</td>' +
+        '<td class="td-m">' + (j.PickupLocation||'—') + '</td>' +
+        '<td class="td-m">' + (j.DeliveryLocation||'—') + '</td>' +
+        '<td class="td-m">' + j.StartDate + ' ' + j.StartTime + '</td>' +
+        '<td>' + badge(j.Status) + '</td>' +
+        '<td>' + progressBar(j.Status) + '</td>' +
+      '</tr>';
+    });
+  }
+  document.getElementById('myjobs-tbody').innerHTML = html;
+
+  // Row click to open detail
+  document.querySelectorAll('#myjobs-tbody tr[data-jid]').forEach(function(row) {
+    row.addEventListener('click', function() { openJobModal(row.getAttribute('data-jid')); });
+  });
+}
+
+// -- TRUCK ROWS --
+function populateTruckTypeSelects() {
+  var items = DROPDOWNS['Job Type'] || [];
+  var opts = items.map(function(t){ return '<option>'+t+'</option>'; }).join('');
+  document.querySelectorAll('#truck-rows .j-truck-type').forEach(function(sel){ sel.innerHTML = opts; });
+}
+
+function resetTruckRows() {
+  var container = document.getElementById('truck-rows');
+  if(!container) return;
+  container.innerHTML = buildTruckRowHTML(0);
+  populateTruckTypeSelects();
+  wireRemoveTruckBtn();
+}
+
+function loadTruckRows(trucks) {
+  var container = document.getElementById('truck-rows');
+  if(!container) return;
+  if(!trucks || !trucks.length) { resetTruckRows(); return; }
+  container.innerHTML = trucks.map(function(t,i){ return buildTruckRowHTML(i); }).join('');
+  populateTruckTypeSelects();
+  trucks.forEach(function(t,i) {
+    var row = container.querySelectorAll('.truck-row')[i];
+    if(!row) return;
+    var typeEl = row.querySelector('.j-truck-type');
+    var amtEl  = row.querySelector('.j-truck-amount');
+    var drvEl  = row.querySelector('.j-truck-driver');
+    if(typeEl) typeEl.value = t.type || '';
+    if(amtEl)  amtEl.value  = t.amount || '';
+    if(drvEl)  drvEl.value  = t.driver || '';
+    if(i > 0) { var rb = row.querySelector('.remove-truck'); if(rb) rb.style.display=''; }
+  });
+  wireRemoveTruckBtn();
+}
+
+function buildTruckRowHTML(idx) {
+  return '<div class="truck-row" data-idx="'+idx+'" style="background:#fafafa;border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:10px">' +
+    '<div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">' +
+      'Truck '+(idx+1)+' <button class="mj-btn-sm remove-truck" style="background:var(--red);'+(idx===0?'display:none':'')+'">Remove</button>' +
+    '</div>' +
+    '<div class="mj-field"><div class="mj-fl">Job Type:</div><div class="mj-fc"><select class="j-truck-type"></select></div></div>' +
+    '<div class="mj-field"><div class="mj-fl">Amount:</div><div class="mj-fc"><input type="number" class="j-truck-amount" placeholder="0" min="0" step="1"></div></div>' +
+    '<div class="mj-field"><div class="mj-fl">Driver Details:</div><div class="mj-fc"><textarea class="j-truck-driver" placeholder="Driver name, phone, license plate" style="min-height:60px;resize:vertical"></textarea></div></div>' +
+  '</div>';
+}
+
+function wireRemoveTruckBtn() {
+  document.querySelectorAll('#truck-rows .remove-truck').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var row = btn.closest('.truck-row');
+      if(row) { row.remove(); renumberTrucks(); }
+    });
+  });
+}
+
+function renumberTrucks() {
+  document.querySelectorAll('#truck-rows .truck-row').forEach(function(row, i) {
+    row.setAttribute('data-idx', i);
+    var lbl = row.querySelector('div > div:first-child');
+    if(lbl) lbl.childNodes[0].textContent = 'Truck '+(i+1)+' ';
+    var rb = row.querySelector('.remove-truck');
+    if(rb) rb.style.display = i===0 ? 'none' : '';
+  });
+}
+
+function collectTruckRows() {
+  var trucks = [];
+  document.querySelectorAll('#truck-rows .truck-row').forEach(function(row) {
+    var type = row.querySelector('.j-truck-type') ? row.querySelector('.j-truck-type').value : '';
+    var amt  = row.querySelector('.j-truck-amount') ? row.querySelector('.j-truck-amount').value : '';
+    var drv  = row.querySelector('.j-truck-driver') ? row.querySelector('.j-truck-driver').value : '';
+    if(type || drv) trucks.push({type:type, amount:amt, driver:drv});
+  });
+  return trucks;
+}
+
+// -- NOTIFICATIONS (Google Apps Script Email via API) --
+function sendConfirmNotification(job) {
+  if(!API_URL) return; // needs API to send email
+  var trucks = (job.Trucks||[]).map(function(t,i){
+    return 'Truck '+(i+1)+': '+t.type+(t.amount?' | Amount: '+t.amount:'')+(t.driver?' | Driver: '+t.driver:'');
+  }).join('\n');
+  var body = [
+    'Job Confirmed: ' + job.JobID,
+    'Customer: ' + job.Customer,
+    'Start Date: ' + job.StartDate + ' ' + job.StartTime,
+    'Pickup: ' + (job.PickupLocation||''),
+    job.PickupContact ? 'Pickup Contact: ' + job.PickupContact : '',
+    job.ReturnPoint ? 'Container Return: ' + job.ReturnPoint : '',
+    job.ReturnContact ? 'Return Contact: ' + job.ReturnContact : '',
+    'Delivery: ' + (job.DeliveryLocation||''),
+    job.DeliveryContact ? 'Delivery Contact: ' + job.DeliveryContact : '',
+    'Cargo Type: ' + (job.CargoType||''),
+    job.Dimensions ? 'Dimensions: ' + job.Dimensions : '',
+
+    job.KGS     ? 'KGS: '      + job.KGS      : '',
+    trucks ? '\nTruck Details:\n' + trucks : '',
+    job.Remark ? '\nRemark: ' + job.Remark : '',
+    '\nConfirmed by: ' + SESSION.username
+  ].filter(Boolean).join('\n');
+  // Find creator's email from USERS store
+  var creatorEmail = '';
+  if(job.CreatedBy) {
+    var creator = USERS.find(function(u){ return u.username===job.CreatedBy; });
+    if(creator && creator.email) creatorEmail = creator.email;
+  }
+  // Also include any manually set notification emails from settings
+  var settingsEmails = localStorage.getItem('tms_notif_emails') || '';
+  var allEmails = [creatorEmail, settingsEmails].filter(Boolean).join(',');
+  if(!allEmails) return;
+  apiCall({action:'sendNotification', jobId:job.JobID, subject:'[MSI-3T] Job Confirmed: '+job.JobID, body:body, emails:allEmails}, function(){});
 }
 
 // -- WIRE UP ALL EVENTS --
@@ -1173,6 +1757,24 @@ document.getElementById('lbtn').addEventListener('click', doLogin);
 document.getElementById('lu').addEventListener('keydown', function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('lp').addEventListener('keydown', function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('btn-logout').addEventListener('click', doLogout);
+
+document.getElementById('j-return-point').addEventListener('input', function(){
+  var val = this.value.trim();
+  var linkDiv = document.getElementById('j-return-map-link');
+  var match = LOCATIONS.find(function(l){ return l.name===val; });
+  if(match && match.url) {
+    linkDiv.innerHTML = '<a href="'+match.url+'" target="_blank" style="font-size:12px;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:3px">Map link - '+(match.address||match.name)+'</a>';
+  } else { linkDiv.innerHTML = ''; }
+});
+
+document.getElementById('j-pickup-manual').addEventListener('input', function(){
+  var val = this.value.trim();
+  var linkDiv = document.getElementById('j-pickup-map-link');
+  var match = LOCATIONS.find(function(l){ return l.name===val; });
+  if(match && match.url) {
+    linkDiv.innerHTML = '<a href="'+match.url+'" target="_blank" style="font-size:12px;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:3px">Map link - '+(match.address||match.name)+'</a>';
+  } else { linkDiv.innerHTML = ''; }
+});
 
 document.querySelectorAll('.nav-item[data-page]').forEach(function(n){
   n.addEventListener('click', function(){goto(n.getAttribute('data-page'));});
@@ -1195,16 +1797,97 @@ document.getElementById('btn-close-pdf').addEventListener('click', function(){cl
 document.getElementById('btn-cancel-pdf').addEventListener('click', function(){closeModal('modal-pdf');});
 document.getElementById('btn-gen-pdf').addEventListener('click', generatePDF);
 
+// -- LOCATIONS PAGE --
+function renderLocationsPage() {
+  var html = '';
+  if(!LOCATIONS.length) {
+    html = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--gray)">No locations saved yet. Click + Add Location to start.</td></tr>';
+  } else {
+    LOCATIONS.forEach(function(loc, i) {
+      html += '<tr>' +
+        '<td style="font-weight:500">' + loc.name + '</td>' +
+        '<td class="td-m">' + (loc.address||'') + '</td>' +
+        '<td><a href="' + loc.url + '" target="_blank" style="color:var(--blue);font-size:13px;text-decoration:none">Open Maps</a></td>' +
+        '<td><button class="btn btn-sm btn-red" data-idx="' + i + '" data-act="del-loc">Delete</button></td>' +
+      '</tr>';
+    });
+  }
+  document.getElementById('locs-tbody').innerHTML = html;
+  var btns = document.querySelectorAll('#locs-tbody button[data-act]');
+  btns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = parseInt(btn.getAttribute('data-idx'));
+      if(confirm('Delete location "' + LOCATIONS[idx].name + '"?')) {
+        LOCATIONS.splice(idx, 1); saveLocs(); renderLocationsPage();
+      }
+    });
+  });
+}
+
+document.getElementById('btn-add-loc').addEventListener('click', function(){
+  document.getElementById('loc-modal-title').textContent = 'Add Location';
+  document.getElementById('loc-name').value = '';
+  document.getElementById('loc-address').value = '';
+  document.getElementById('loc-url').value = '';
+  openModal('modal-loc');
+});
+document.getElementById('btn-close-loc').addEventListener('click', function(){ closeModal('modal-loc'); });
+document.getElementById('btn-cancel-loc').addEventListener('click', function(){ closeModal('modal-loc'); });
+document.getElementById('btn-save-loc').addEventListener('click', function(){
+  var name = document.getElementById('loc-name').value.trim();
+  var url = document.getElementById('loc-url').value.trim();
+  var address = document.getElementById('loc-address').value.trim();
+  if(!name || !url) { toast('Name and Google Maps link are required'); return; }
+  LOCATIONS.push({name:name, url:url, address:address});
+  saveLocs(); closeModal('modal-loc'); renderLocationsPage();
+  toast('Location saved: ' + name);
+});
+
 document.getElementById('jobs-filter').addEventListener('change', renderJobsTable);
 document.getElementById('btn-runai').addEventListener('click', function(){renderConsolidation();toast('AI analysis complete');});
-document.getElementById('btn-add-point').addEventListener('click', function(){
-  var dp=document.getElementById('delivery-points');
-  var div=document.createElement('div');div.style.cssText='display:flex;gap:6px;margin-top:6px;align-items:center';
-  div.innerHTML='<input type="text" list="location-list" placeholder="Delivery location" style="flex:1;padding:6px 9px;border:1px solid var(--border);border-radius:var(--r);font-size:13px"><button style="padding:4px 8px;background:var(--red);color:#fff;border:none;border-radius:var(--r);cursor:pointer">x</button>';
-  div.querySelector('button').addEventListener('click',function(){div.remove();});
+function addDeliveryPointWithVal(preselectedName) {
+  var dp = document.getElementById('delivery-points');
+  var div = document.createElement('div');
+  div.className = 'dp-row';
+  div.style.cssText = 'display:flex;gap:6px;margin-top:6px;align-items:center;background:#f9fafb;border:1px solid var(--border);border-radius:var(--r);padding:6px 8px';
+  div.innerHTML = '<input type="text" list="saved-locations-list" placeholder="Type address or select saved location" value="' + (preselectedName||'').replace(/"/g,'&quot;') + '" style="flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">' +
+    '<a href="#" target="_blank" class="dp-maplink" style="font-size:12px;color:var(--blue);white-space:nowrap;display:none">Map</a>' +
+    '<button style="padding:3px 9px;background:var(--red);color:#fff;border:none;border-radius:var(--r);cursor:pointer;font-size:12px">X</button>';
+  var inp = div.querySelector('input');
+  var mapLink = div.querySelector('.dp-maplink');
+  function syncMapLink() {
+    var match = LOCATIONS.find(function(l){ return l.name===inp.value.trim(); });
+    if(match && match.url) {
+      mapLink.href = match.url; mapLink.style.display = 'inline';
+      mapLink.textContent = 'Map: ' + match.name;
+    } else { mapLink.style.display = 'none'; }
+  }
+  inp.addEventListener('input', syncMapLink);
+  if(preselectedName) syncMapLink();
+  div.querySelector('button').addEventListener('click', function(){ div.remove(); });
   dp.appendChild(div);
+}
+
+document.getElementById('btn-add-point').addEventListener('click', function(){ addDeliveryPointWithVal(''); });
+// User modal events
+document.getElementById('btn-add-user').addEventListener('click', function(){ openUserModal(null); });
+document.getElementById('btn-close-user').addEventListener('click', function(){ closeModal('modal-user'); });
+document.getElementById('btn-cancel-user').addEventListener('click', function(){ closeModal('modal-user'); });
+document.getElementById('btn-save-user').addEventListener('click', saveUser);
+document.getElementById('btn-delete-user').addEventListener('click', deleteUser);
+
+// My Jobs page events
+document.getElementById('myjobs-filter').addEventListener('change', function(){ renderMyJobs(); });
+document.getElementById('btn-myjobs-new').addEventListener('click', function(){ openJobModal(null); });
+
+document.getElementById('btn-add-truck').addEventListener('click', function() {
+  var container = document.getElementById('truck-rows');
+  var count = container.querySelectorAll('.truck-row').length;
+  container.insertAdjacentHTML('beforeend', buildTruckRowHTML(count));
+  populateTruckTypeSelects();
+  wireRemoveTruckBtn();
 });
-document.getElementById('btn-routing').addEventListener('click', function(){toast('Route calculation uses Google Maps API in live build');});
+
 document.getElementById('btn-save-api').addEventListener('click', saveAPIUrl);
 document.getElementById('btn-save-rules').addEventListener('click', saveRules);
 document.getElementById('pdf-tmpl-upload').addEventListener('change', function(){uploadTemplate(this);});
