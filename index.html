@@ -651,8 +651,8 @@ function setApiStatus(ok) {
 
 // ── AUTH ───────────────────────────────────────────────
 function doLogout() {
+  clearJobsCache();
   SESSION = null; JOBS = [];
-  localStorage.removeItem('tms_jobs_cache');
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
   sv('lu',''); sv('lp','');
@@ -687,68 +687,91 @@ function applyRole() {
 // ── DATA ───────────────────────────────────────────────
 // Normalize a job object from the API (camelCase keys) to the PascalCase the app uses internally
 function normalizeJob(j) {
-  if(!j) return j;
-  // If already PascalCase (has JobID), pass through
-  if(j.JobID) return j;
-  // Map camelCase API keys -> PascalCase internal keys
+  if(!j || typeof j !== 'object') return null;
+  // Google Sheets Apps Script commonly returns rows as objects with header-named keys
+  // Handle both camelCase (from our API payload) and PascalCase (stored internally)
+  // Also handle sheet column names which might be lowercase or have spaces
+  function get(keys) {
+    for(var k=0; k<keys.length; k++) {
+      var v = j[keys[k]];
+      if(v !== undefined && v !== null && v !== '') return String(v);
+    }
+    return '';
+  }
   return {
-    JobID:              j.jobId      || j.jobID      || j.JobID      || '',
-    RefNo:              j.refNo      || j.RefNo      || '',
-    Customer:           j.customer   || j.Customer   || '',
-    ShortDesc:          j.shortDesc  || j.ShortDesc  || '',
-    JobType:            j.jobType    || j.JobType    || '',
-    StartDate:          j.startDate  || j.StartDate  || '',
-    StartTime:          j.startTime  || j.StartTime  || '',
-    EndDate:            j.endDate    || j.EndDate    || '',
-    EndTime:            j.endTime    || j.EndTime    || '',
-    PickupLocation:     j.pickupLocation  || j.PickupLocation  || '',
-    PickupLocationUrl:  j.pickupLocationUrl || j.PickupLocationUrl || '',
-    PickupContact:      j.pickupContact || j.PickupContact || '',
-    DeliveryLocation:   j.deliveryLocation || j.DeliveryLocation || '',
-    DeliveryContact:    j.deliveryContact  || j.DeliveryContact  || '',
-    DeliveryPoints:     j.deliveryPoints   || j.DeliveryPoints   || [],
-    ReturnPoint:        j.returnPoint  || j.ReturnPoint  || '',
-    ReturnContact:      j.returnContact || j.ReturnContact || '',
-    XRay:               j.xray       || j.XRay       || '',
-    Dimensions:         j.dimensions || j.Dimensions || '',
-    KGS:                j.kgs        || j.KGS        || '',
-    CargoType:          j.cargoType  || j.CargoType  || '',
-    Trucks:             j.trucks     || j.Trucks     || [],
-    Amount:             j.amount     || j.Amount     || '',
-    DriverDetails:      j.driverDetails || j.DriverDetails || '',
-    Remark:             j.remark     || j.Remark     || '',
-    Status:             j.status     || j.Status     || 'Pending',
-    ConsolidationGroup: j.consolidationGroup || j.ConsolidationGroup || '',
-    CreatedBy:          j.createdBy  || j.CreatedBy  || '',
-    CreatedAt:          j.createdAt  || j.CreatedAt  || '',
-    UpdatedAt:          j.updatedAt  || j.UpdatedAt  || '',
-    UploadedFiles:      j.uploadedFiles || j.UploadedFiles || null
+    JobID:             get(['JobID','jobId','jobID','job_id','id']),
+    RefNo:             get(['RefNo','refNo','ref_no','RefNo']),
+    Customer:          get(['Customer','customer']),
+    ShortDesc:         get(['ShortDesc','shortDesc','short_desc','description']),
+    JobType:           get(['JobType','jobType','job_type']),
+    StartDate:         get(['StartDate','startDate','start_date']),
+    StartTime:         get(['StartTime','startTime','start_time']),
+    EndDate:           get(['EndDate','endDate','end_date']),
+    EndTime:           get(['EndTime','endTime','end_time']),
+    PickupLocation:    get(['PickupLocation','pickupLocation','pickup_location','pickup']),
+    PickupLocationUrl: get(['PickupLocationUrl','pickupLocationUrl','pickup_url']),
+    PickupContact:     get(['PickupContact','pickupContact','pickup_contact']),
+    DeliveryLocation:  get(['DeliveryLocation','deliveryLocation','delivery_location','delivery']),
+    DeliveryContact:   get(['DeliveryContact','deliveryContact','delivery_contact']),
+    DeliveryPoints:    j.DeliveryPoints || j.deliveryPoints || [],
+    ReturnPoint:       get(['ReturnPoint','returnPoint','return_point']),
+    ReturnContact:     get(['ReturnContact','returnContact','return_contact']),
+    XRay:              get(['XRay','xray','x_ray']),
+    Dimensions:        get(['Dimensions','dimensions']),
+    KGS:               get(['KGS','kgs','weight']),
+    CargoType:         get(['CargoType','cargoType','cargo_type']),
+    Trucks:            j.Trucks || j.trucks || [],
+    Amount:            get(['Amount','amount']),
+    DriverDetails:     get(['DriverDetails','driverDetails','driver_details','driver']),
+    Remark:            get(['Remark','remark','notes']),
+    Status:            get(['Status','status']) || 'Pending',
+    ConsolidationGroup: get(['ConsolidationGroup','consolidationGroup','consolidation_group']),
+    CreatedBy:         get(['CreatedBy','createdBy','created_by']),
+    CreatedAt:         get(['CreatedAt','createdAt','created_at']),
+    UpdatedAt:         get(['UpdatedAt','updatedAt','updated_at']),
+    UploadedFiles:     j.UploadedFiles || j.uploadedFiles || null
   };
 }
 
-function saveJobsCache(){ try{ localStorage.setItem('tms_jobs_cache', JSON.stringify(JOBS)); }catch(e){} }
-function loadJobsCache(){ try{ var c=localStorage.getItem('tms_jobs_cache'); if(c){ var j=JSON.parse(c); if(Array.isArray(j)&&j.length) return j; } }catch(e){} return null; }
+function saveJobsCache(){
+  if(!SESSION) return;
+  try{ localStorage.setItem('tms_jobs_cache_' + SESSION.username, JSON.stringify(JOBS)); }catch(e){}
+}
+function loadJobsCache(){
+  if(!SESSION) return null;
+  try{
+    var c = localStorage.getItem('tms_jobs_cache_' + SESSION.username);
+    if(c){ var j=JSON.parse(c); if(Array.isArray(j)) return j; }
+  }catch(e){}
+  return null;
+}
+function clearJobsCache(){
+  if(!SESSION) return;
+  localStorage.removeItem('tms_jobs_cache_' + SESSION.username);
+}
 
 function loadAll() {
   if(API_URL) {
+    // Show cached jobs immediately while API loads (instant UI)
+    var cached = loadJobsCache();
+    if(cached) { JOBS = cached; renderAll(); }
+
     apiCall({action:'getJobs'}, function(res) {
       if(res && res.ok && Array.isArray(res.jobs)) {
         JOBS = res.jobs.map(normalizeJob);
         saveJobsCache();
         setApiStatus(true);
       } else {
-        // API failed - try cache first, then demo
-        var cached = loadJobsCache();
-        if(cached) { JOBS = cached; setApiStatus(false); }
-        else { setApiStatus(false); loadDemo(); }
+        // API failed - keep cached if we have it, otherwise show empty
+        if(!cached) { JOBS = []; }
+        setApiStatus(false);
       }
       renderAll();
     });
   } else {
     setApiStatus(false);
-    // No API - try cache first, then demo
     var cached = loadJobsCache();
-    if(cached) { JOBS = cached; }
+    if(cached && cached.length) { JOBS = cached; }
     else { loadDemo(); }
     renderAll();
   }
@@ -786,8 +809,8 @@ if(!String.prototype.padStart){String.prototype.padStart=function(len,ch){var s=
 
 function renderDashboard() {
   if(!Array.isArray(JOBS)) JOBS = [];
-  if(!calYear) calYear = new Date().getFullYear();
-  if(calMonth === undefined || calMonth === null) calMonth = new Date().getMonth();
+  if(typeof calYear === 'undefined' || !calYear) calYear = new Date().getFullYear();
+  if(typeof calMonth === 'undefined' || calMonth === null) calMonth = new Date().getMonth();
   var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var headers = '';
   for(var i=0; i<days.length; i++) headers += '<div class="cal-day-hdr">' + days[i] + '</div>';
