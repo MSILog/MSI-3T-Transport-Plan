@@ -652,6 +652,7 @@ function setApiStatus(ok) {
 // ── AUTH ───────────────────────────────────────────────
 function doLogout() {
   SESSION = null; JOBS = [];
+  localStorage.removeItem('tms_jobs_cache');
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
   sv('lu',''); sv('lp','');
@@ -725,21 +726,30 @@ function normalizeJob(j) {
   };
 }
 
+function saveJobsCache(){ try{ localStorage.setItem('tms_jobs_cache', JSON.stringify(JOBS)); }catch(e){} }
+function loadJobsCache(){ try{ var c=localStorage.getItem('tms_jobs_cache'); if(c){ var j=JSON.parse(c); if(Array.isArray(j)&&j.length) return j; } }catch(e){} return null; }
+
 function loadAll() {
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
       if(res && res.ok && Array.isArray(res.jobs)) {
         JOBS = res.jobs.map(normalizeJob);
+        saveJobsCache();
         setApiStatus(true);
       } else {
-        setApiStatus(false);
-        loadDemo();
+        // API failed - try cache first, then demo
+        var cached = loadJobsCache();
+        if(cached) { JOBS = cached; setApiStatus(false); }
+        else { setApiStatus(false); loadDemo(); }
       }
       renderAll();
     });
   } else {
     setApiStatus(false);
-    loadDemo();
+    // No API - try cache first, then demo
+    var cached = loadJobsCache();
+    if(cached) { JOBS = cached; }
+    else { loadDemo(); }
     renderAll();
   }
 }
@@ -1086,6 +1096,7 @@ function saveJob() {
       UpdatedAt:(new Date()).toISOString()
     });
     if(API_URL) apiCall(payload, function(){});
+    saveJobsCache();
     closeModal('modal-job'); toast('Updated ' + editingJobId); renderAll();
   } else {
     var now = new Date();
@@ -1113,6 +1124,7 @@ function saveJob() {
     };
     JOBS.push(newJob);
     if(API_URL) apiCall(payload, function(r){ if(r&&r.jobId) newJob.JobID=r.jobId; });
+    saveJobsCache();
     closeModal('modal-job'); toast('Created ' + newId); renderAll();
   }
 }
@@ -1121,6 +1133,7 @@ function deleteJob(jobId) {
   if(!confirm('Delete job ' + jobId + '? This cannot be undone.')) return;
   JOBS = JOBS.filter(function(j){return j.JobID!==jobId;});
   if(API_URL) apiCall({action:'deleteJob', jobId:jobId, deletedBy:SESSION.username}, function(){});
+  saveJobsCache();
   toast('Deleted ' + jobId); renderAll();
 }
 
@@ -1483,6 +1496,7 @@ function confirmJob(jobId) {
   job.Status = 'Confirmed';
   job.UpdatedAt = new Date().toISOString();
   if(API_URL) apiCall({action:'updateStatus', jobId:jobId, status:'Confirmed', updatedBy:SESSION.username}, function(){});
+  saveJobsCache();
   sendConfirmNotification(job);
   toast(jobId + ' confirmed');
   renderAll();
@@ -1496,6 +1510,7 @@ function completeJob(jobId) {
   job.Status = 'Complete';
   job.UpdatedAt = new Date().toISOString();
   if(API_URL) apiCall({action:'updateStatus', jobId:jobId, status:'Complete', updatedBy:SESSION.username}, function(){});
+  saveJobsCache();
   toast(jobId + ' marked Complete');
   renderAll();
 }
