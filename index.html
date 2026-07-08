@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>MSI-3T Order Planning</title>
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -788,9 +791,12 @@ function loadAll() {
     apiCall({action:'getJobs'}, function(res) {
       if(res && res.ok && Array.isArray(res.jobs)) {
         // Debug: log first job to see what Sheets is returning
-        if(res.jobs.length > 0) console.log('[TMS] First job from API:', JSON.stringify(res.jobs[0]).slice(0,300));
+        if(res.jobs.length > 0) {
+          console.log('[TMS] First job RAW keys:', Object.keys(res.jobs[0]).join(', '));
+          console.log('[TMS] First job RAW PickupDate:', res.jobs[0].PickupDate, 'StartDate:', res.jobs[0].StartDate);
+        }
         var jobs = res.jobs.map(normalizeJob).filter(function(j){ return j && j.JobID; });
-        console.log('[TMS] After normalize, job count:', jobs.length, jobs.length > 0 ? 'First StartDate:' + jobs[0].StartDate : '');
+        console.log('[TMS] After normalize:', jobs.length, 'jobs. First StartDate:', jobs.length ? jobs[0].StartDate : 'n/a');
         if(jobs.length > 0) {
           JOBS = jobs;
           saveJobsCache();
