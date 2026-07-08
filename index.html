@@ -72,7 +72,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 .cal-day.hasjobs{border-color:#aac8f0}
 .cal-dn{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
 .cal-day.today .cal-dn{color:var(--blue)}
-.cal-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin:1px 2px;vertical-align:middle;flex-shrink:0}
+.cal-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);margin:1px 2px;vertical-align:middle;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
 .cal-dot.orange{background:#ea7c1e}.cal-dot.grn{background:var(--green)}.cal-dot.pur{background:var(--purple)}
 .ai-banner{background:linear-gradient(135deg,#0D1B3E 0%,#1a3a6e 100%);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:16px;color:#fff}
 .ai-bh{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;font-size:14px}
@@ -740,44 +740,54 @@ function loadJobsCache(){
 function normalizeDate(v) {
   if(!v) return '';
   v = String(v).trim();
-  if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10); // already ISO
-  // M/D/YYYY or D/M/YYYY - try to parse
+  // Already ISO YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10);
+  // Google Sheets date serial number (days since Dec 30 1899)
+  if(/^\d{5}$/.test(v)) {
+    var serial = parseInt(v);
+    var d = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+    return d.toISOString().slice(0,10);
+  }
+  // M/D/YYYY (Google Sheets default display format)
   var m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
   if(m) {
     var yr = m[3].length===2 ? '20'+m[3] : m[3];
-    // Google Sheets uses M/D/YYYY
     var mo = String(parseInt(m[1])).padStart(2,'0');
     var dy = String(parseInt(m[2])).padStart(2,'0');
     return yr + '-' + mo + '-' + dy;
   }
+  // DD/MM/YYYY
+  var m2 = v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(m2) return m2[3] + '-' + m2[2] + '-' + m2[1];
   return v;
 }
 
 function loadAll() {
-  // Always show cached jobs immediately (instant UI for any user)
+  // Always show cached jobs immediately (instant UI)
   var cached = loadJobsCache();
-  if(cached) { JOBS = cached; renderAll(); }
+  if(cached && cached.length) { JOBS = cached; renderAll(); }
 
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
       if(res && res.ok && Array.isArray(res.jobs)) {
+        // Debug: log first job to see what Sheets is returning
+        if(res.jobs.length > 0) console.log('[TMS] First job from API:', JSON.stringify(res.jobs[0]).slice(0,300));
         var jobs = res.jobs.map(normalizeJob).filter(function(j){ return j && j.JobID; });
+        console.log('[TMS] After normalize, job count:', jobs.length, jobs.length > 0 ? 'First StartDate:' + jobs[0].StartDate : '');
         if(jobs.length > 0) {
           JOBS = jobs;
           saveJobsCache();
-          setApiStatus(true);
-        } else {
-          // API returned 0 jobs — keep cache, don't wipe real data
-          setApiStatus(true);
         }
+        setApiStatus(true);
       } else {
+        console.log('[TMS] API error or no jobs array:', JSON.stringify(res).slice(0,200));
         setApiStatus(false);
       }
       renderAll();
     });
   } else {
     setApiStatus(false);
-    if(!cached) loadDemo();
+    if(!cached || !cached.length) loadDemo();
     renderAll();
   }
 }
@@ -835,6 +845,7 @@ function renderDashboard() {
   document.getElementById('cal-label').textContent = new Date(calYear, calMonth, 1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
 
   var todayJobs = JOBS.filter(function(j){return j.StartDate===todayStr;});
+  console.log('[TMS] renderDashboard: JOBS=' + JOBS.length + ' todayStr=' + todayStr + ' todayJobs=' + todayJobs.length + (JOBS.length>0?' firstStartDate='+JOBS[0].StartDate:''));
   var pending = JOBS.filter(function(j){return j.Status==='Pending';}).length;
   var confirmed = JOBS.filter(function(j){return j.Status==='Confirmed';}).length;
   var consolidatedTrucks = JOBS.filter(function(j){return j.ConsolidationGroup;}).reduce(function(set,j){set[j.ConsolidationGroup]=1;return set;},{});
@@ -874,7 +885,7 @@ function renderDashboard() {
       var dc = st==='Confirmed'?'orange':st==='Complete'?'grn':'';
       dots += '<span class="cal-dot ' + dc + '" title="' + st + ': ' + dayJobs[di].Customer + '"></span>';
     }
-    var countTxt = dayJobs.length ? '<div style="font-size:10px;color:var(--gray);margin-top:3px">' + dayJobs.length + ' job' + (dayJobs.length>1?'s':'') + '</div>' : '';
+    var countTxt = dayJobs.length ? '<div style="font-size:10px;color:var(--blue);margin-top:3px;font-weight:600">' + dayJobs.length + ' job' + (dayJobs.length>1?'s':'') + '</div>' : '';
     grid += '<div class="' + cls + '" data-date="' + dateStr + '"><div class="cal-dn">' + c.day + '</div><div style="display:flex;flex-wrap:wrap;align-items:center;margin-top:3px">' + dots + '</div>' + countTxt + '</div>';
   }
   document.getElementById('cal-grid').innerHTML = grid;
