@@ -72,7 +72,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 .cal-day.hasjobs{border-color:#aac8f0}
 .cal-dn{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
 .cal-day.today .cal-dn{color:var(--blue)}
-.cal-dot{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:10px;font-weight:700;margin:1px}
+.cal-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin:1px 2px;vertical-align:middle;flex-shrink:0}
 .cal-dot.orange{background:#ea7c1e}.cal-dot.grn{background:var(--green)}.cal-dot.pur{background:var(--purple)}
 .ai-banner{background:linear-gradient(135deg,#0D1B3E 0%,#1a3a6e 100%);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:16px;color:#fff}
 .ai-bh{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;font-size:14px}
@@ -826,10 +826,10 @@ function renderDashboard() {
     for(var di=0; di<Math.min(dayJobs.length,4); di++) {
       var st = dayJobs[di].Status;
       var dc = st==='Confirmed'?'orange':st==='Complete'?'grn':'';
-      dots += '<span class="cal-dot ' + dc + '" style="font-size:0">&nbsp;</span>';
+      dots += '<span class="cal-dot ' + dc + '" title="' + st + ': ' + dayJobs[di].Customer + '"></span>';
     }
     var countTxt = dayJobs.length ? '<div style="font-size:10px;color:var(--gray);margin-top:3px">' + dayJobs.length + ' job' + (dayJobs.length>1?'s':'') + '</div>' : '';
-    grid += '<div class="' + cls + '" data-date="' + dateStr + '"><div class="cal-dn">' + c.day + '</div><div>' + dots + '</div>' + countTxt + '</div>';
+    grid += '<div class="' + cls + '" data-date="' + dateStr + '"><div class="cal-dn">' + c.day + '</div><div style="display:flex;flex-wrap:wrap;align-items:center;margin-top:3px">' + dots + '</div>' + countTxt + '</div>';
   }
   document.getElementById('cal-grid').innerHTML = grid;
 
