@@ -650,14 +650,6 @@ function setApiStatus(ok) {
 }
 
 // ── AUTH ───────────────────────────────────────────────
-function doLogout() {
-  clearJobsCache();
-  SESSION = null; JOBS = [];
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-page').style.display = 'flex';
-  sv('lu',''); sv('lp','');
-}
-
 function applyRole() {
   var r = SESSION.role;
   var names = {cs:'Customer Service', transport:'Transport', admin:'Admin', management:'Management'};
@@ -704,9 +696,9 @@ function normalizeJob(j) {
     Customer:          get(['Customer','customer']),
     ShortDesc:         get(['ShortDesc','shortDesc','short_desc','description']),
     JobType:           get(['JobType','jobType','job_type']),
-    StartDate:         get(['StartDate','startDate','start_date']),
+    StartDate:         normalizeDate(get(['StartDate','startDate','start_date'])),
     StartTime:         get(['StartTime','startTime','start_time']),
-    EndDate:           get(['EndDate','endDate','end_date']),
+    EndDate:           normalizeDate(get(['EndDate','endDate','end_date'])),
     EndTime:           get(['EndTime','endTime','end_time']),
     PickupLocation:    get(['PickupLocation','pickupLocation','pickup_location','pickup']),
     PickupLocationUrl: get(['PickupLocationUrl','pickupLocationUrl','pickup_url']),
@@ -734,47 +726,68 @@ function normalizeJob(j) {
 }
 
 function saveJobsCache(){
-  if(!SESSION) return;
-  try{ localStorage.setItem('tms_jobs_cache_' + SESSION.username, JSON.stringify(JOBS)); }catch(e){}
+  try{ localStorage.setItem('tms_jobs_cache', JSON.stringify(JOBS)); }catch(e){}
 }
 function loadJobsCache(){
-  if(!SESSION) return null;
   try{
-    var c = localStorage.getItem('tms_jobs_cache_' + SESSION.username);
-    if(c){ var j=JSON.parse(c); if(Array.isArray(j)) return j; }
+    var c = localStorage.getItem('tms_jobs_cache');
+    if(c){ var j=JSON.parse(c); if(Array.isArray(j) && j.length) return j; }
   }catch(e){}
   return null;
 }
-function clearJobsCache(){
-  if(!SESSION) return;
-  localStorage.removeItem('tms_jobs_cache_' + SESSION.username);
+
+// Normalize a date string to YYYY-MM-DD regardless of format from Sheets
+function normalizeDate(v) {
+  if(!v) return '';
+  v = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0,10); // already ISO
+  // M/D/YYYY or D/M/YYYY - try to parse
+  var m = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m) {
+    var yr = m[3].length===2 ? '20'+m[3] : m[3];
+    // Google Sheets uses M/D/YYYY
+    var mo = String(parseInt(m[1])).padStart(2,'0');
+    var dy = String(parseInt(m[2])).padStart(2,'0');
+    return yr + '-' + mo + '-' + dy;
+  }
+  return v;
 }
 
 function loadAll() {
-  if(API_URL) {
-    // Show cached jobs immediately while API loads (instant UI)
-    var cached = loadJobsCache();
-    if(cached) { JOBS = cached; renderAll(); }
+  // Always show cached jobs immediately (instant UI for any user)
+  var cached = loadJobsCache();
+  if(cached) { JOBS = cached; renderAll(); }
 
+  if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
       if(res && res.ok && Array.isArray(res.jobs)) {
-        JOBS = res.jobs.map(normalizeJob);
-        saveJobsCache();
-        setApiStatus(true);
+        var jobs = res.jobs.map(normalizeJob).filter(function(j){ return j && j.JobID; });
+        if(jobs.length > 0) {
+          JOBS = jobs;
+          saveJobsCache();
+          setApiStatus(true);
+        } else {
+          // API returned 0 jobs — keep cache, don't wipe real data
+          setApiStatus(true);
+        }
       } else {
-        // API failed - keep cached if we have it, otherwise show empty
-        if(!cached) { JOBS = []; }
         setApiStatus(false);
       }
       renderAll();
     });
   } else {
     setApiStatus(false);
-    var cached = loadJobsCache();
-    if(cached && cached.length) { JOBS = cached; }
-    else { loadDemo(); }
+    if(!cached) loadDemo();
     renderAll();
   }
+}
+
+function doLogout() {
+  // Do NOT clear the jobs cache — all users share the same job data
+  SESSION = null; JOBS = [];
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+  sv('lu',''); sv('lp','');
 }
 
 function loadDemo() {
