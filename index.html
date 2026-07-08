@@ -680,9 +680,6 @@ function applyRole() {
 // Normalize a job object from the API (camelCase keys) to the PascalCase the app uses internally
 function normalizeJob(j) {
   if(!j || typeof j !== 'object') return null;
-  // Google Sheets Apps Script commonly returns rows as objects with header-named keys
-  // Handle both camelCase (from our API payload) and PascalCase (stored internally)
-  // Also handle sheet column names which might be lowercase or have spaces
   function get(keys) {
     for(var k=0; k<keys.length; k++) {
       var v = j[keys[k]];
@@ -690,37 +687,57 @@ function normalizeJob(j) {
     }
     return '';
   }
+  // Dates: strip time part from ISO datetime strings like "2026-06-25T17:00:00.000Z"
+  function getDate(keys) {
+    var v = get(keys);
+    if(!v) return '';
+    // ISO datetime — take the date part only
+    if(/^\d{4}-\d{2}-\d{2}T/.test(v)) return v.slice(0,10);
+    return normalizeDate(v);
+  }
+  // Times: extract HH:MM from ISO datetime like "1899-12-30T05:17:56.000Z"
+  function getTime(keys) {
+    var v = get(keys);
+    if(!v) return '';
+    var m = v.match(/T(\d{2}:\d{2})/);
+    if(m) return m[1];
+    if(/^\d{2}:\d{2}/.test(v)) return v.slice(0,5);
+    return v;
+  }
   return {
-    JobID:             get(['JobID','jobId','jobID','job_id','id']),
-    RefNo:             get(['RefNo','refNo','ref_no','RefNo']),
+    // ID: your sheet uses "TMS-260626-633" style — keep as-is
+    JobID:             get(['JobID','jobId','jobID','job_id','id','OrderID','orderId']),
+    RefNo:             get(['RefNo','refNo','ref_no','MSIJobNo','msiJobNo']),
     Customer:          get(['Customer','customer']),
-    ShortDesc:         get(['ShortDesc','shortDesc','short_desc','description']),
+    ShortDesc:         get(['ShortDesc','shortDesc','short_desc','Description','description']),
     JobType:           get(['JobType','jobType','job_type']),
-    StartDate:         normalizeDate(get(['StartDate','startDate','start_date'])),
-    StartTime:         get(['StartTime','startTime','start_time']),
-    EndDate:           normalizeDate(get(['EndDate','endDate','end_date'])),
-    EndTime:           get(['EndTime','endTime','end_time']),
-    PickupLocation:    get(['PickupLocation','pickupLocation','pickup_location','pickup']),
+    // Dates: your sheet uses PickupDate/PickupTime
+    StartDate:         getDate(['StartDate','startDate','PickupDate','pickupDate','start_date','pickup_date']),
+    StartTime:         getTime(['StartTime','startTime','PickupTime','pickupTime','start_time','pickup_time']),
+    EndDate:           getDate(['EndDate','endDate','DeliveryDate','deliveryDate','end_date']),
+    EndTime:           getTime(['EndTime','endTime','DeliveryTime','deliveryTime','end_time']),
+    // Locations: your sheet uses PickupAddress/DeliveryAddress
+    PickupLocation:    get(['PickupLocation','pickupLocation','PickupAddress','pickupAddress','pickup_address','pickup_location','pickup']),
     PickupLocationUrl: get(['PickupLocationUrl','pickupLocationUrl','pickup_url']),
     PickupContact:     get(['PickupContact','pickupContact','pickup_contact']),
-    DeliveryLocation:  get(['DeliveryLocation','deliveryLocation','delivery_location','delivery']),
+    DeliveryLocation:  get(['DeliveryLocation','deliveryLocation','DeliveryAddress','deliveryAddress','delivery_address','delivery_location','delivery']),
     DeliveryContact:   get(['DeliveryContact','deliveryContact','delivery_contact']),
     DeliveryPoints:    j.DeliveryPoints || j.deliveryPoints || [],
-    ReturnPoint:       get(['ReturnPoint','returnPoint','return_point']),
+    ReturnPoint:       get(['ReturnPoint','returnPoint','return_point','ContainerReturn','containerReturn']),
     ReturnContact:     get(['ReturnContact','returnContact','return_contact']),
-    XRay:              get(['XRay','xray','x_ray']),
-    Dimensions:        get(['Dimensions','dimensions']),
-    KGS:               get(['KGS','kgs','weight']),
-    CargoType:         get(['CargoType','cargoType','cargo_type']),
+    XRay:              get(['XRay','xray','x_ray','Xray']),
+    Dimensions:        get(['Dimensions','dimensions','Dimension']),
+    KGS:               get(['KGS','kgs','Weight','weight','Pieces','pieces']),
+    CargoType:         get(['CargoType','cargoType','cargo_type','Cargo']),
     Trucks:            j.Trucks || j.trucks || [],
     Amount:            get(['Amount','amount']),
-    DriverDetails:     get(['DriverDetails','driverDetails','driver_details','driver']),
-    Remark:            get(['Remark','remark','notes']),
+    DriverDetails:     get(['DriverDetails','driverDetails','driver_details','Driver','driver','DriverName','driverName']),
+    Remark:            get(['Remark','remark','notes','Notes','Remarks']),
     Status:            get(['Status','status']) || 'Pending',
     ConsolidationGroup: get(['ConsolidationGroup','consolidationGroup','consolidation_group']),
     CreatedBy:         get(['CreatedBy','createdBy','created_by']),
-    CreatedAt:         get(['CreatedAt','createdAt','created_at']),
-    UpdatedAt:         get(['UpdatedAt','updatedAt','updated_at']),
+    CreatedAt:         getDate(['CreatedAt','createdAt','created_at']),
+    UpdatedAt:         getDate(['UpdatedAt','updatedAt','updated_at']),
     UploadedFiles:     j.UploadedFiles || j.uploadedFiles || null
   };
 }
