@@ -1586,15 +1586,22 @@ function generatePDF() {
       try {
         var f = form.getTextField(fieldName);
         f.setText(safe(val||''));
-        f.enableReadOnly();
+        // Do NOT make read-only — user should be able to type in PDF
       } catch(e) { /* field not found — skip */ }
     }
-    // Fill all form fields
-    sf('Job No',               j.JobID);
-    sf('Issued Data',          j.StartDate);
+    // Format date as DD/MM/YYYY
+    function fmtDate(iso) {
+      if(!iso) return '';
+      var p = iso.slice(0,10).split('-');
+      if(p.length===3) return p[2]+'/'+p[1]+'/'+p[0];
+      return iso;
+    }
+    // Fill all form fields — do NOT flatten so user can still type
+    sf('Job No',               j.RefNo || j.JobID);
+    sf('Issued Data',          fmtDate(j.StartDate));
     sf('Instructed by',        'Wapat');
-    sf('Date of Pick up',      j.StartDate + ' ' + j.StartTime);
-    sf('Date of Delivery',     j.EndDate || j.StartDate);
+    sf('Date of Pick up',      fmtDate(j.StartDate) + ' ' + (j.StartTime||''));
+    sf('Date of Delivery',     fmtDate(j.EndDate || j.StartDate));
     sf('Dimension',            j.Dimensions);
     sf('Place of Pick up',     j.PickupLocation);
     sf('Person in charge1',    j.PickupContact);
@@ -1607,8 +1614,8 @@ function generatePDF() {
     sf('Car Registration No',  safe(firstTruck.driver||'').split('\n')[2]||'');
     sf('Remark1',              j.Remark);
     sf('Total',                j.KGS ? j.KGS + ' KGS' : '');
-    sf('MBL No',               j.RefNo);
-    form.flatten();
+    sf('MBL No',               j.JobID);
+    // Do NOT flatten — leave fields editable so user can type additional info
     return pdfDoc.save();
   }).then(function(bytes) {
     var blob = new Blob([bytes], {type:'application/pdf'});
@@ -1725,7 +1732,8 @@ function restoreUploadedFiles(job) {
     var statusEl = document.getElementById('status-' + slot);
     if(statusEl && f) {
       if(f.fileData) {
-        statusEl.innerHTML = '\u2713 <a href="'+f.fileData+'" download="'+f.fileName+'" style="color:var(--blue)">'+f.fileName+'</a>';
+        statusEl.innerHTML = '\u2713 ' + f.fileName +
+          ' <button class="btn btn-sm btn-view-upload" style="padding:2px 8px;font-size:11px;margin-left:6px">View</button>';
       } else {
         statusEl.textContent = '\u2713 ' + f.fileName;
       }
@@ -1824,7 +1832,8 @@ function handleUploadSlot(slot, file) {
         rawText: text.slice(0,2000),
         parsedFields: fields
       };
-      statusEl.innerHTML = '\u2713 <a href="'+base64+'" download="'+file.name+'" style="color:var(--blue)">'+file.name+'</a>';
+      statusEl.innerHTML = '\u2713 ' + file.name +
+        ' <button class="btn btn-sm btn-view-upload" style="padding:2px 8px;font-size:11px;margin-left:6px">View</button>';
       var applied = applyParsedFieldsToForm(fields);
       if(applied.length) toast('Auto-filled from ' + file.name + ': ' + applied.join(', '));
       else toast(file.name + ' uploaded');
@@ -2183,6 +2192,14 @@ document.getElementById('btn-add-truck').addEventListener('click', function() {
 document.getElementById('btn-save-api').addEventListener('click', saveAPIUrl);
 document.getElementById('btn-save-rules').addEventListener('click', saveRules);
 document.getElementById('pdf-tmpl-upload').addEventListener('change', function(){uploadTemplate(this);});
+
+// Delegated listener for View buttons in upload slots
+document.addEventListener('click', function(e) {
+  if(e.target && e.target.classList.contains('btn-view-upload')) {
+    var f = UPLOADED_FILES && UPLOADED_FILES.additional;
+    if(f && f.fileData) openFileViewer(f.fileData, f.fileName);
+  }
+});
 
 document.querySelectorAll('.overlay').forEach(function(o){
   o.addEventListener('click',function(e){if(e.target===o)o.classList.remove('open');});
