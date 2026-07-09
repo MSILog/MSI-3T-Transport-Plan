@@ -746,7 +746,21 @@ function normalizeJob(j) {
 }
 
 function saveJobsCache(){
-  try{ localStorage.setItem('tms_jobs_cache', JSON.stringify(JOBS)); }catch(e){}
+  try{
+    var deletedIds = getDeletedIds();
+    localStorage.setItem('tms_jobs_cache', JSON.stringify(JOBS));
+    localStorage.setItem('tms_deleted_ids', JSON.stringify(deletedIds));
+  }catch(e){}
+}
+function getDeletedIds(){
+  try{ var d=localStorage.getItem('tms_deleted_ids'); return d?JSON.parse(d):[]; }catch(e){ return []; }
+}
+function addDeletedId(jobId){
+  var ids = getDeletedIds();
+  if(ids.indexOf(jobId)<0) ids.push(jobId);
+  // Keep last 200 deletions max
+  if(ids.length>200) ids = ids.slice(ids.length-200);
+  try{ localStorage.setItem('tms_deleted_ids', JSON.stringify(ids)); }catch(e){}
 }
 function loadJobsCache(){
   try{
@@ -820,9 +834,13 @@ function mergeJobs(cached, apiJobs) {
 }
 
 function loadAll() {
-  // Always show cached jobs immediately
+  // Always show cached jobs immediately, filtering out deleted ones
   var cached = loadJobsCache();
-  if(cached && cached.length) { JOBS = cached; renderAll(); }
+  var deletedIds = getDeletedIds();
+  if(cached && cached.length) {
+    JOBS = cached.filter(function(j){ return deletedIds.indexOf(j.JobID)<0; });
+    renderAll();
+  }
 
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
@@ -830,7 +848,10 @@ function loadAll() {
         console.log('[TMS] API raw keys:', Object.keys(res.jobs[0]).join(', '));
         var merged = mergeJobs(cached, res.jobs);
         console.log('[TMS] Merged jobs:', merged.length, 'First StartDate:', merged.length ? merged[0].StartDate : 'n/a');
-        if(merged.length > 0) {
+        // Remove any jobs that were deleted locally
+        var delIds = getDeletedIds();
+        merged = merged.filter(function(j){ return delIds.indexOf(j.JobID)<0; });
+        if(merged.length > 0 || JOBS.length === 0) {
           JOBS = merged;
           saveJobsCache();
         }
@@ -1237,6 +1258,7 @@ function saveJob() {
 function deleteJob(jobId) {
   if(!confirm('Delete job ' + jobId + '? This cannot be undone.')) return;
   JOBS = JOBS.filter(function(j){return j.JobID!==jobId;});
+  addDeletedId(jobId);
   if(API_URL) apiCall({action:'deleteJob', jobId:jobId, deletedBy:SESSION.username}, function(){});
   saveJobsCache();
   toast('Deleted ' + jobId); renderAll();
@@ -1526,13 +1548,20 @@ function generatePDF() {
   if(!PDF_TMPL) { toast('Upload MSI_form_template.pdf in Settings first.'); btn.textContent='Download PDF'; btn.disabled=false; return; }
   PDFLib.PDFDocument.load(PDF_TMPL).then(function(pdfDoc) {
     var form = pdfDoc.getForm();
-    function sf(name,val){try{form.getTextField(name).setText(val||'');}catch(e){}}
+    // setText only supports WinAnsi - strip any non-latin characters to avoid encode error
+    function sf(name, val) {
+      try {
+        // Replace Thai and other non-WinAnsi characters with safe equivalents
+        var safe = (val||'').replace(/[^\x00-\xFF]/g, '').trim();
+        form.getTextField(name).setText(safe);
+      } catch(e) {}
+    }
     sf('Issued Data', j.StartDate);
     sf('Instructed by', 'Wapat');
-    sf('Date of Pick up', j.StartDate + ' ' + j.StartTime + 'น.');
+    sf('Date of Pick up', j.StartDate + ' ' + j.StartTime);
     sf('Date of Delivery', j.EndDate||j.StartDate);
-    sf('Place of Pick up', (j.PickupLocation||'') + ', ' + j.PickupProvince + ' ' + j.PickupPostal);
-    sf('Place of Delivery', (j.DeliveryLocation||'') + ', ' + j.DeliveryProvince + ' ' + j.DeliveryPostal);
+    sf('Place of Pick up', j.PickupLocation||'');
+    sf('Place of Delivery', j.DeliveryLocation||'');
     sf('Customer Name', j.Customer);
     form.flatten();
     return pdfDoc.save();
@@ -1540,7 +1569,7 @@ function generatePDF() {
     var blob = new Blob([bytes],{type:'application/pdf'});
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a.href=url; a.download='PICK UP & DELIVERY CARGO - '+j.PickupProvince+' - '+j.DeliveryProvince+' - '+j.StartDate+'.pdf';
+    a.href=url; a.download='PICK UP & DELIVERY CARGO - '+(j.PickupLocation||'Pickup').replace(/[^\x00-\xFF]/g,'').slice(0,20)+' - '+(j.DeliveryLocation||'Delivery').replace(/[^\x00-\xFF]/g,'').slice(0,20)+' - '+j.StartDate+'.pdf';
     a.click(); URL.revokeObjectURL(url);
     toast('PDF downloaded ✓'); closeModal('modal-pdf');
   }).catch(function(err){ toast('Error: '+err.message); })
