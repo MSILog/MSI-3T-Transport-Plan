@@ -782,28 +782,63 @@ function normalizeDate(v) {
   return v;
 }
 
+function mergeJobs(cached, apiJobs) {
+  // Build a map of cached jobs by ID
+  var cacheMap = {};
+  (cached || []).forEach(function(j){ if(j.JobID) cacheMap[j.JobID] = j; });
+
+  // For each API job, normalize it and merge with cached version
+  apiJobs.forEach(function(apiJob) {
+    var norm = normalizeJob(apiJob);
+    if(!norm || !norm.JobID) return;
+
+    var existing = cacheMap[norm.JobID];
+    if(existing) {
+      // Keep cached StartDate if API version is empty
+      if(!norm.StartDate && existing.StartDate) norm.StartDate = existing.StartDate;
+      if(!norm.StartTime && existing.StartTime) norm.StartTime = existing.StartTime;
+      if(!norm.Customer && existing.Customer) norm.Customer = existing.Customer;
+      if(!norm.PickupLocation && existing.PickupLocation) norm.PickupLocation = existing.PickupLocation;
+      if(!norm.DeliveryLocation && existing.DeliveryLocation) norm.DeliveryLocation = existing.DeliveryLocation;
+      // Always take API status (most up to date)
+      if(norm.Status) existing.Status = norm.Status;
+      // Merge everything else from API
+      cacheMap[norm.JobID] = Object.assign({}, existing, norm,
+        { StartDate: norm.StartDate || existing.StartDate,
+          StartTime: norm.StartTime || existing.StartTime,
+          Customer: norm.Customer || existing.Customer,
+          PickupLocation: norm.PickupLocation || existing.PickupLocation,
+          DeliveryLocation: norm.DeliveryLocation || existing.DeliveryLocation });
+    } else {
+      cacheMap[norm.JobID] = norm;
+    }
+  });
+
+  var result = [];
+  Object.keys(cacheMap).forEach(function(k){ result.push(cacheMap[k]); });
+  return result;
+}
+
 function loadAll() {
-  // Always show cached jobs immediately (instant UI)
+  // Always show cached jobs immediately
   var cached = loadJobsCache();
   if(cached && cached.length) { JOBS = cached; renderAll(); }
 
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
-      if(res && res.ok && Array.isArray(res.jobs)) {
-        // Debug: log first job to see what Sheets is returning
-        if(res.jobs.length > 0) {
-          console.log('[TMS] First job RAW keys:', Object.keys(res.jobs[0]).join(', '));
-          console.log('[TMS] First job RAW PickupDate:', res.jobs[0].PickupDate, 'StartDate:', res.jobs[0].StartDate);
-        }
-        var jobs = res.jobs.map(normalizeJob).filter(function(j){ return j && j.JobID; });
-        console.log('[TMS] After normalize:', jobs.length, 'jobs. First StartDate:', jobs.length ? jobs[0].StartDate : 'n/a');
-        if(jobs.length > 0) {
-          JOBS = jobs;
+      if(res && res.ok && Array.isArray(res.jobs) && res.jobs.length > 0) {
+        console.log('[TMS] API raw keys:', Object.keys(res.jobs[0]).join(', '));
+        var merged = mergeJobs(cached, res.jobs);
+        console.log('[TMS] Merged jobs:', merged.length, 'First StartDate:', merged.length ? merged[0].StartDate : 'n/a');
+        if(merged.length > 0) {
+          JOBS = merged;
           saveJobsCache();
         }
         setApiStatus(true);
+      } else if(res && res.ok) {
+        // Connected but zero rows returned — keep cache
+        setApiStatus(true);
       } else {
-        console.log('[TMS] API error or no jobs array:', JSON.stringify(res).slice(0,200));
         setApiStatus(false);
       }
       renderAll();
@@ -868,7 +903,7 @@ function renderDashboard() {
   document.getElementById('cal-label').textContent = new Date(calYear, calMonth, 1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
 
   var todayJobs = JOBS.filter(function(j){return j.StartDate===todayStr;});
-  console.log('[TMS] renderDashboard: JOBS=' + JOBS.length + ' todayStr=' + todayStr + ' todayJobs=' + todayJobs.length + (JOBS.length>0?' firstStartDate='+JOBS[0].StartDate:''));
+  console.log('[TMS] Dashboard: jobs='+JOBS.length+' today='+todayStr+' matches='+todayJobs.length+(JOBS.length>0?' sample='+JOBS[0].StartDate:''));
   var pending = JOBS.filter(function(j){return j.Status==='Pending';}).length;
   var confirmed = JOBS.filter(function(j){return j.Status==='Confirmed';}).length;
   var consolidatedTrucks = JOBS.filter(function(j){return j.ConsolidationGroup;}).reduce(function(set,j){set[j.ConsolidationGroup]=1;return set;},{});
