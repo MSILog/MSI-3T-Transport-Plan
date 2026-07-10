@@ -451,11 +451,11 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           <div style="border-top:1px solid var(--border);margin:10px 0 12px"></div>
 
           <div class="mj-field">
-            <div class="mj-fl">Additional File:</div>
+            <div class="mj-fl">Additional Files:</div>
             <div class="mj-fc">
-              <input type="file" id="upload-additional" accept=".pdf" style="display:none">
-              <button class="mj-btn-sm" id="btn-upload-additional" type="button">Upload PDF</button>
-              <span id="status-additional" style="font-size:12px;color:var(--gray);margin-left:8px"></span>
+              <input type="file" id="upload-additional" accept=".pdf,image/*" multiple style="display:none">
+              <button class="mj-btn-sm" id="btn-upload-additional" type="button">+ Upload Files</button>
+              <div id="status-additional" style="margin-top:8px"></div>
             </div>
           </div>
         </div>
@@ -604,7 +604,7 @@ var PDF_TMPL_B64 = 'JVBERi0xLjQNCiWhs8XXDQoxIDAgb2JqDQo8PC9PdXRsaW5lcyA3IDAgUiAv
 var PDF_TMPL = null; // kept for compatibility but template always loads from PDF_TMPL_B64
 var SESSION = null;
 var JOBS = [];
-var UPLOADED_FILES = {additional:null};
+var UPLOADED_FILES = []; // array of {fileName, fileData, slot}
 var currentPDFJob = null;
 var calYear = new Date().getFullYear();
 var calMonth = new Date().getMonth();
@@ -722,8 +722,20 @@ function normalizeJob(j) {
     return v;
   }
   return {
-    // ID: your sheet uses "TMS-260626-633" style — keep as-is
-    JobID:             get(['JobID','jobId','jobID','job_id','id','OrderID','orderId']),
+    // Normalize job ID — rename any TMS-XXXXXX to Order format
+    JobID: (function() {
+      var id = get(['JobID','jobId','jobID','job_id','id','OrderID','orderId']);
+      // Convert TMS-YYMMDD-NNN style to OrderYYMMDDNNNN style
+      if(id && /^TMS-/i.test(id)) {
+        var parts = id.replace(/^TMS-/i,'').split('-');
+        if(parts.length >= 2) {
+          var datePart = parts[0]; // e.g. 260710
+          var numPart  = parts[1]; // e.g. 913
+          return 'Order' + datePart + String(parseInt(numPart)||0).padStart(4,'0');
+        }
+      }
+      return id;
+    })(),
     RefNo:             get(['RefNo','refNo','ref_no','MSIJobNo','msiJobNo']),
     Customer:          get(['Customer','customer']),
     ShortDesc:         get(['ShortDesc','shortDesc','short_desc','Description','description']),
@@ -755,7 +767,14 @@ function normalizeJob(j) {
     CreatedBy:         get(['CreatedBy','createdBy','created_by']),
     CreatedAt:         getDate(['CreatedAt','createdAt','created_at']),
     UpdatedAt:         getDate(['UpdatedAt','updatedAt','updated_at']),
-    UploadedFiles:     j.UploadedFiles || j.uploadedFiles || null
+    UploadedFiles: (function() {
+      var f = j.UploadedFiles || j.uploadedFiles;
+      if(!f) return [];
+      if(Array.isArray(f)) return f;
+      // Old format was {additional: {...}} — convert to array
+      if(f.additional) return [f.additional];
+      return [];
+    })()
   };
 }
 
@@ -1021,8 +1040,10 @@ function openDayModal(dateStr) {
         '<div style="flex:1"><div style="font-weight:500">' + j.Customer + '</div>' +
           '<div style="font-size:11px;color:var(--gray)">' + j.PickupLocation + ' \u2192 ' + (j.DeliveryLocation||j.DeliveryProvince||'') + '</div>' +
           (tsLabel ? '<div style="font-size:11px;color:#aaa;margin-top:2px">' + tsLabel + '</div>' : '') +
-          (j.UploadedFiles && j.UploadedFiles.additional && j.UploadedFiles.additional.fileData ?
-            '<div style="margin-top:3px"><button class="btn btn-sm" style="font-size:11px;padding:2px 8px" data-jid="'+j.JobID+'" data-act="viewfile">&#x1F4CE; View: '+j.UploadedFiles.additional.fileName+'</button></div>' : '') +
+          (j.UploadedFiles && Array.isArray(j.UploadedFiles) && j.UploadedFiles.length ?
+            '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">' +
+            j.UploadedFiles.map(function(f,fi){ return '<button class="btn btn-sm" style="font-size:11px;padding:2px 7px" data-jid="'+j.JobID+'" data-fi="'+fi+'" data-act="viewfile">&#x1F4CE; '+f.fileName+'</button>'; }).join('') +
+            '</div>' : '') +
         '</div>' +
         '<div style="min-width:60px;font-size:12px;color:var(--gray)">' + j.StartTime + '</div>' +
         '<div>' + badge(j.Status) + '</div>' +
@@ -1050,8 +1071,10 @@ function openDayModal(dateStr) {
           else if(act==='del') deleteJob(jid);
           else if(act==='viewfile') {
             var fj = JOBS.find(function(x){return x.JobID===jid;});
-            if(fj && fj.UploadedFiles && fj.UploadedFiles.additional) {
-              openFileViewer(fj.UploadedFiles.additional.fileData, fj.UploadedFiles.additional.fileName);
+            var fiFi = parseInt(btn.getAttribute('data-fi')||'0');
+            if(fj && Array.isArray(fj.UploadedFiles) && fj.UploadedFiles[fiFi]) {
+              closeModal('modal-day');
+              openFileViewer(fj.UploadedFiles[fiFi].fileData, fj.UploadedFiles[fiFi].fileName);
             }
           }
         });
@@ -1597,7 +1620,12 @@ function generatePDF() {
       return iso;
     }
     // Fill all form fields — do NOT flatten so user can still type
-    sf('Job No',               j.RefNo || j.JobID);
+    // Centre-align Job No to match template style
+    try {
+      var jobNoField = form.getTextField('Job No');
+      jobNoField.setText(safe(j.RefNo || j.JobID));
+      jobNoField.setAlignment(PDFLib.TextAlignment.Center);
+    } catch(e) {}
     sf('Issued Data',          fmtDate(j.StartDate));
     sf('Instructed by',        'Wapat');
     sf('Date of Pick up',      fmtDate(j.StartDate) + ' ' + (j.StartTime||''));
@@ -1614,7 +1642,9 @@ function generatePDF() {
     sf('Car Registration No',  safe(firstTruck.driver||'').split('\n')[2]||'');
     sf('Remark1',              j.Remark);
     sf('Total',                j.KGS ? j.KGS + ' KGS' : '');
-    sf('MBL No',               j.JobID);
+    // MBL No and HBL No left blank — filled manually by user
+    sf('MBL No', '');
+    sf('HBL No', '');
     // Do NOT flatten — leave fields editable so user can type additional info
     return pdfDoc.save();
   }).then(function(bytes) {
@@ -1717,7 +1747,7 @@ if (typeof pdfjsLib !== 'undefined') {
 }
 
 function resetUploadSlots() {
-  UPLOADED_FILES = {additional:null};
+  UPLOADED_FILES = [];
   var statusEl = document.getElementById('status-additional');
   if(statusEl) statusEl.innerHTML = '';
   var inputEl = document.getElementById('upload-additional');
@@ -1726,19 +1756,36 @@ function resetUploadSlots() {
 
 function restoreUploadedFiles(job) {
   if(!job.UploadedFiles) return;
-  UPLOADED_FILES = job.UploadedFiles;
-  ['additional'].forEach(function(slot) {
-    var f = UPLOADED_FILES[slot];
-    var statusEl = document.getElementById('status-' + slot);
-    if(statusEl && f) {
-      if(f.fileData) {
-        statusEl.innerHTML = '\u2713 ' + f.fileName +
-          ' <button class="btn btn-sm btn-view-upload" style="padding:2px 8px;font-size:11px;margin-left:6px">View</button>';
+  UPLOADED_FILES = Array.isArray(job.UploadedFiles) ? job.UploadedFiles : [];
+  renderUploadedFiles();
+}
+
+function renderUploadedFiles() {
+  var statusEl = document.getElementById('status-additional');
+  if(!statusEl) return;
+  if(!UPLOADED_FILES.length) { statusEl.innerHTML = ''; return; }
+  var html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">';
+  UPLOADED_FILES.forEach(function(f, i) {
+    var isImg = f.fileData && f.fileData.indexOf('data:image')===0;
+    var preview = '';
+    if(f.fileData) {
+      if(isImg) {
+        preview = '<img src="'+f.fileData+'" style="width:100%;max-height:200px;object-fit:contain;border:1px solid var(--border);border-radius:var(--r);margin-top:6px;cursor:pointer" data-fi="'+i+'" class="file-preview-img">';
       } else {
-        statusEl.textContent = '\u2713 ' + f.fileName;
+        preview = '<iframe src="'+f.fileData+'" style="width:100%;height:220px;border:1px solid var(--border);border-radius:var(--r);margin-top:6px;pointer-events:none"></iframe>';
       }
     }
+    html += '<div style="background:#f9fafb;border:1px solid var(--border);border-radius:var(--r);padding:8px 10px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+        '<span style="font-size:12px;font-weight:500;flex:1">&#x1F4CE; '+f.fileName+'</span>' +
+        (f.fileData ? '<button class="btn btn-sm btn-view-upload" style="padding:2px 8px;font-size:11px" data-fi="'+i+'">View</button>' : '') +
+        '<button class="btn btn-sm" style="padding:2px 8px;font-size:11px;color:var(--red);border-color:var(--red)" data-fi="'+i+'" data-act="rm-file">&#x2715;</button>' +
+      '</div>' +
+      preview +
+    '</div>';
   });
+  html += '</div>';
+  statusEl.innerHTML = html;
 }
 
 function extractTextFromPDF(file, callback) {
@@ -1817,40 +1864,42 @@ function applyParsedFieldsToForm(fields) {
   return applied;
 }
 
-function handleUploadSlot(slot, file) {
-  var statusEl = document.getElementById('status-' + slot);
-  statusEl.textContent = 'Reading...';
-  // Read as base64 so it can be stored in the job and downloaded by anyone
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var base64 = e.target.result; // data:application/pdf;base64,...
-    extractTextFromPDF(file, function(text) {
-      var fields = parseShippingText(text);
-      UPLOADED_FILES[slot] = {
-        fileName: file.name,
-        fileData: base64,  // full base64 for download
-        rawText: text.slice(0,2000),
-        parsedFields: fields
-      };
-      statusEl.innerHTML = '\u2713 ' + file.name +
-        ' <button class="btn btn-sm btn-view-upload" style="padding:2px 8px;font-size:11px;margin-left:6px">View</button>';
-      var applied = applyParsedFieldsToForm(fields);
-      if(applied.length) toast('Auto-filled from ' + file.name + ': ' + applied.join(', '));
-      else toast(file.name + ' uploaded');
-    });
-  };
-  reader.readAsDataURL(file);
+function handleUploadFiles(files) {
+  var total = files.length;
+  var done = 0;
+  Array.from(files).forEach(function(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var base64 = e.target.result;
+      var isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      var entry = {fileName: file.name, fileData: base64, rawText: '', parsedFields: {}};
+      if(isPDF) {
+        extractTextFromPDF(file, function(text) {
+          entry.rawText = text.slice(0,2000);
+          entry.parsedFields = parseShippingText(text);
+          UPLOADED_FILES.push(entry);
+          done++;
+          renderUploadedFiles();
+          if(done === total) {
+            var applied = applyParsedFieldsToForm(entry.parsedFields);
+            toast(file.name + ' uploaded' + (applied.length ? ' — auto-filled: ' + applied.join(', ') : ''));
+          }
+        });
+      } else {
+        UPLOADED_FILES.push(entry);
+        done++;
+        renderUploadedFiles();
+        if(done === total) toast(total + ' file(s) uploaded');
+      }
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
-['additional'].forEach(function(slot){
-  var btn = document.getElementById('btn-upload-' + slot);
-  var input = document.getElementById('upload-' + slot);
-  if(btn && input) {
-    btn.addEventListener('click', function(){ input.click(); });
-    input.addEventListener('change', function(){
-      if(this.files && this.files[0]) handleUploadSlot(slot, this.files[0]);
-    });
-  }
+document.getElementById('btn-upload-additional').addEventListener('click', function(){ document.getElementById('upload-additional').click(); });
+document.getElementById('upload-additional').addEventListener('change', function(){
+  if(this.files && this.files.length) handleUploadFiles(this.files);
+  this.value = '';
 });
 
 // -- MY JOBS PAGE --
@@ -2193,11 +2242,23 @@ document.getElementById('btn-save-api').addEventListener('click', saveAPIUrl);
 document.getElementById('btn-save-rules').addEventListener('click', saveRules);
 document.getElementById('pdf-tmpl-upload').addEventListener('change', function(){uploadTemplate(this);});
 
-// Delegated listener for View buttons in upload slots
+// Delegated listener for file preview actions
 document.addEventListener('click', function(e) {
-  if(e.target && e.target.classList.contains('btn-view-upload')) {
-    var f = UPLOADED_FILES && UPLOADED_FILES.additional;
+  var t = e.target;
+  if(t && t.classList.contains('btn-view-upload')) {
+    var fi = parseInt(t.getAttribute('data-fi')||'0');
+    var f = UPLOADED_FILES[fi];
     if(f && f.fileData) openFileViewer(f.fileData, f.fileName);
+  }
+  if(t && t.getAttribute('data-act') === 'rm-file') {
+    var fi2 = parseInt(t.getAttribute('data-fi')||'0');
+    UPLOADED_FILES.splice(fi2, 1);
+    renderUploadedFiles();
+  }
+  if(t && t.classList.contains('file-preview-img')) {
+    var fi3 = parseInt(t.getAttribute('data-fi')||'0');
+    var f3 = UPLOADED_FILES[fi3];
+    if(f3 && f3.fileData) openFileViewer(f3.fileData, f3.fileName);
   }
 });
 
