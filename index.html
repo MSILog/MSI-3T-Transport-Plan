@@ -208,9 +208,6 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
       <div class="nav-item" id="nav-dropdowns" data-page="dropdowns">
         <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Dropdowns</span>
       </div>
-      <div class="nav-item" id="nav-admin" data-page="admin" style="display:none">
-        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Users</span>
-      </div>
       <div class="nav-item" id="nav-settings" data-page="settings">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg><span>Settings</span>
       </div>
@@ -300,17 +297,6 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
       <div class="page" id="page-dropdowns">
         <div class="page-hdr"><div class="page-title">Dropdown Lists</div></div>
         <div id="dd-content"></div>
-      </div>
-
-      <div class="page" id="page-admin">
-        <div class="page-hdr">
-          <div class="page-title">User Management</div>
-          <button class="btn btn-primary btn-sm" id="btn-add-user">+ Add User</button>
-        </div>
-        <div class="card"><div class="tw"><table>
-          <thead><tr><th>Full Name</th><th>Username</th><th>Role</th><th>Email (notifications)</th><th>Status</th><th></th></tr></thead>
-          <tbody id="users-tbody"></tbody>
-        </table></div></div>
       </div>
 
       <div class="page" id="page-settings">
@@ -515,14 +501,6 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
     </div>
   </div>
 </div>
-
-<!-- USER MODAL -->
-<div class="overlay" id="modal-user">
-  <div class="modal" style="width:480px">
-    <div class="modal-hdr">
-      <span class="modal-title" id="user-modal-title">Add User</span>
-      <button class="btn btn-sm btn-icon" id="btn-close-user">X</button>
-    </div>
     <div style="padding:20px">
       <div style="margin-bottom:13px">
         <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Full Name *</label>
@@ -686,7 +664,6 @@ function applyRole() {
   document.getElementById('nav-jobs').style.display = (r==='cs') ? 'none' : 'flex';
   document.getElementById('nav-consolidate').style.display = (r==='transport'||r==='admin') ? 'flex' : 'none';
   document.getElementById('nav-myjobs').style.display = (r==='cs'||r==='admin') ? 'flex' : 'none';
-  document.getElementById('nav-admin').style.display = (r==='admin') ? 'flex' : 'none';
   var savedUrl = localStorage.getItem('tms_api_url');
   if(savedUrl) sv('api-url-inp', savedUrl);
   var savedTmpl = localStorage.getItem('tms_pdf_template');
@@ -835,13 +812,14 @@ function mergeJobs(cached, apiJobs) {
     return cust + '|' + date;
   }
 
-  // Start with cached jobs (best field data, correct IDs)
+  // Start with cached jobs (best field data, correct IDs) — skip temp local jobs
   var result = [];
   var usedIds = {};
   var usedFPs = {};
 
   (cached || []).forEach(function(j) {
     if(!j.JobID) return;
+    if(j._local) return;  // skip temp jobs not yet confirmed by server
     if(delIds.indexOf(j.JobID) >= 0) return;
     result.push(j);
     usedIds[j.JobID] = result.length - 1;
@@ -1293,10 +1271,11 @@ function saveJob() {
     var yy = String(now.getFullYear()).slice(2);
     var mm = String(now.getMonth()+1).padStart(2,'0');
     var prefix = 'Order' + yy + mm;
-    var sameMonth = JOBS.filter(function(j){ return j.JobID && j.JobID.indexOf(prefix)===0; }).length;
-    var newId = prefix + String(sameMonth+1).padStart(4,'0');
+    // Count only confirmed server-side jobs this month (not temp local ones)
+    var sameMonth = JOBS.filter(function(j){ return j.JobID && j.JobID.indexOf(prefix)===0 && !j._local; }).length;
+    var tempId = prefix + String(sameMonth+1).padStart(4,'0');
     var newJob = {
-      JobID:newId, RefNo:payload.refNo, Customer:payload.customer, ShortDesc:payload.shortDesc,
+      JobID:tempId, RefNo:payload.refNo, Customer:payload.customer, ShortDesc:payload.shortDesc,
       JobType:payload.jobType,
       StartDate:payload.startDate, StartTime:payload.startTime,
       EndDate:payload.endDate, EndTime:payload.endTime,
@@ -1310,12 +1289,33 @@ function saveJob() {
       CargoType:payload.cargoType, UploadedFiles:payload.uploadedFiles,
       Status:'Pending', ConsolidationGroup:'',
       CreatedBy:SESSION.username,
-      CreatedAt:(new Date()).toISOString(), UpdatedAt:(new Date()).toISOString()
+      CreatedAt:(new Date()).toISOString(), UpdatedAt:(new Date()).toISOString(),
+      _local: true  // flag: not yet confirmed by server
     };
-    JOBS.push(newJob);
-    if(API_URL) apiCall(payload, function(r){ if(r&&r.jobId) newJob.JobID=r.jobId; });
-    saveJobsCache();
-    closeModal('modal-job'); toast('Created ' + newId); renderAll();
+
+    if(API_URL) {
+      // Wait for server to assign the real ID before showing
+      JOBS.push(newJob);
+      closeModal('modal-job');
+      toast('Saving...');
+      apiCall(payload, function(r) {
+        if(r && r.jobId) {
+          newJob.JobID = r.jobId;  // replace temp ID with server ID
+        }
+        delete newJob._local;
+        saveJobsCache();
+        toast('Created ' + newJob.JobID);
+        renderAll();
+      });
+    } else {
+      // No API — use local ID directly
+      delete newJob._local;
+      JOBS.push(newJob);
+      saveJobsCache();
+      closeModal('modal-job');
+      toast('Created ' + tempId);
+      renderAll();
+    }
   }
 }
 
@@ -1489,7 +1489,8 @@ function doLogin() {
   if(!u || !p) { err.textContent = 'Please enter username and password.'; err.style.display = 'block'; return; }
 
   function attemptLogin() {
-    var match = USERS.find(function(usr){ return usr.username===u && usr.password===p && usr.active; });
+    function isActive(v) { return v === true || v === 1 || String(v).toLowerCase() === 'true'; }
+    var match = USERS.find(function(usr){ return usr.username===u && usr.password===p && isActive(usr.active); });
     if(!match) { err.textContent = 'Invalid username or password.'; err.style.display = 'block'; return; }
     SESSION = {role:match.role, fullName:match.fullName, username:match.username, email:match.email||''};
     document.getElementById('login-page').style.display = 'none';
@@ -1511,95 +1512,6 @@ function doLogin() {
   } else {
     attemptLogin();
   }
-}
-
-// -- ADMIN PAGE --
-var editingUserId = null;
-
-function renderAdmin() {
-  var html = '';
-  if(!USERS.length) {
-    html = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--gray)">No users yet.</td></tr>';
-  } else {
-    var roleLabels = {cs:'Customer Service', transport:'Transport', admin:'Admin', management:'Management'};
-    var roleBadge  = {cs:'b-confirmed', transport:'b-transit', admin:'b-pending', management:'b-delivered'};
-    USERS.forEach(function(u, i) {
-      html += '<tr>' +
-        '<td style="font-weight:500">' + u.fullName + '</td>' +
-        '<td class="td-m">' + u.username + '</td>' +
-        '<td><span class="badge '+(roleBadge[u.role]||'b-pending')+'">'+(roleLabels[u.role]||u.role)+'</span></td>' +
-        '<td class="td-m">' + (u.email||'<span style="color:#ccc">—</span>') + '</td>' +
-        '<td><span class="badge '+(u.active?'b-delivered':'b-pending')+'">'+(u.active?'Active':'Inactive')+'</span></td>' +
-        '<td><button class="btn btn-sm" data-uidx="'+i+'" data-act="edit-user">Edit</button></td>' +
-      '</tr>';
-    });
-  }
-  document.getElementById('users-tbody').innerHTML = html;
-  document.querySelectorAll('#users-tbody button[data-act]').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      openUserModal(parseInt(btn.getAttribute('data-uidx')));
-    });
-  });
-}
-
-function openUserModal(idx) {
-  editingUserId = (idx !== undefined && idx !== null) ? idx : null;
-  var isNew = editingUserId === null;
-  document.getElementById('user-modal-title').textContent = isNew ? 'Add User' : 'Edit User';
-  document.getElementById('btn-delete-user').style.display = isNew ? 'none' : '';
-  if(isNew) {
-    document.getElementById('u-fullname').value = '';
-    document.getElementById('u-username').value = '';
-    document.getElementById('u-password').value = '';
-    document.getElementById('u-role').value = 'cs';
-    document.getElementById('u-email').value = '';
-    document.getElementById('u-active').value = 'true';
-  } else {
-    var u = USERS[editingUserId];
-    document.getElementById('u-fullname').value = u.fullName || '';
-    document.getElementById('u-username').value = u.username || '';
-    document.getElementById('u-password').value = '';
-    document.getElementById('u-role').value = u.role || 'cs';
-    document.getElementById('u-email').value = u.email || '';
-    document.getElementById('u-active').value = u.active ? 'true' : 'false';
-  }
-  openModal('modal-user');
-}
-
-function saveUser() {
-  var fullName = document.getElementById('u-fullname').value.trim();
-  var username = document.getElementById('u-username').value.trim();
-  var password = document.getElementById('u-password').value.trim();
-  var role     = document.getElementById('u-role').value;
-  var email    = document.getElementById('u-email').value.trim();
-  var active   = document.getElementById('u-active').value === 'true';
-  if(!fullName || !username) { toast('Full name and username are required'); return; }
-  if(editingUserId === null && !password) { toast('Password is required for new users'); return; }
-  // Check duplicate username
-  var dupIdx = USERS.findIndex(function(u, i){ return u.username===username && i!==editingUserId; });
-  if(dupIdx >= 0) { toast('Username already exists'); return; }
-  if(editingUserId === null) {
-    USERS.push({username:username, password:password, role:role, fullName:fullName, email:email, active:active});
-  } else {
-    var u = USERS[editingUserId];
-    u.fullName = fullName; u.username = username; u.role = role; u.email = email; u.active = active;
-    if(password) u.password = password;
-  }
-  saveUsers();
-  if(API_URL) apiCall({action:'saveUser', user:{username:username, password:password, role:role, fullName:fullName, email:email, active:active}, updatedBy:SESSION.username}, function(){});
-  closeModal('modal-user'); renderAdmin();
-  toast((editingUserId===null?'User added: ':'User updated: ') + fullName);
-}
-
-function deleteUser() {
-  if(editingUserId === null) return;
-  var u = USERS[editingUserId];
-  if(!confirm('Delete user "' + u.fullName + '"? This cannot be undone.')) return;
-  if(u.username === SESSION.username) { toast('You cannot delete your own account'); return; }
-  USERS.splice(editingUserId, 1);
-  saveUsers();
-  closeModal('modal-user'); renderAdmin();
-  toast('User deleted');
 }
 
 // -- PDF --
@@ -1740,7 +1652,6 @@ function goto(page) {
   var nv=document.getElementById('nav-'+page); if(nv) nv.classList.add('active');
   if(page==='jobs') renderJobsTable();
   if(page==='consolidate') renderConsolidation();
-  if(page==='admin') renderAdmin();
   if(page==='dropdowns') renderDropdowns();
   if(page==='dashboard') renderDashboard();
   if(page==='locations') renderLocationsPage();
@@ -2252,12 +2163,6 @@ function addDeliveryPointWithVal(preselectedName) {
 }
 
 document.getElementById('btn-add-point').addEventListener('click', function(){ addDeliveryPointWithVal(''); });
-// User modal events
-document.getElementById('btn-add-user').addEventListener('click', function(){ openUserModal(null); });
-document.getElementById('btn-close-user').addEventListener('click', function(){ closeModal('modal-user'); });
-document.getElementById('btn-cancel-user').addEventListener('click', function(){ closeModal('modal-user'); });
-document.getElementById('btn-save-user').addEventListener('click', saveUser);
-document.getElementById('btn-delete-user').addEventListener('click', deleteUser);
 
 // My Jobs page events
 document.getElementById('myjobs-filter').addEventListener('change', function(){ renderMyJobs(); });
