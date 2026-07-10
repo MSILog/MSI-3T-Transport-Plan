@@ -75,8 +75,8 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 .cal-day.hasjobs{border-color:#aac8f0}
 .cal-dn{font-size:12px;font-weight:600;color:#374151;margin-bottom:5px}
 .cal-day.today .cal-dn{color:var(--blue)}
-.cal-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);margin:1px 2px;vertical-align:middle;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
-.cal-dot.orange{background:#ea7c1e}.cal-dot.grn{background:var(--green)}.cal-dot.pur{background:var(--purple)}
+.cal-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--amber);margin:1px 2px;vertical-align:middle;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+.cal-dot.blue{background:var(--blue)}.cal-dot.grn{background:var(--green)}.cal-dot.pur{background:var(--purple)}
 .ai-banner{background:linear-gradient(135deg,#0D1B3E 0%,#1a3a6e 100%);border-radius:var(--r-lg);padding:16px 18px;margin-bottom:16px;color:#fff}
 .ai-bh{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px;font-size:14px}
 .ai-bh svg{width:18px;height:18px;stroke:#60A5FA;fill:none;stroke-width:2}
@@ -616,6 +616,14 @@ function safeJSON(key, fallback) {
 }
 
 var RULES = safeJSON('tms_rules', {match:'province', sameDate:'same', thresh:'75'});
+// Clear any old cached dropdowns that had removed keys
+(function(){
+  var dd = safeJSON('tms_dropdowns', null);
+  if(dd && (dd['Transportation Area'] || dd['Vehicle'] || dd['Province'] || dd['Trailer'])) {
+    localStorage.removeItem('tms_dropdowns');
+  }
+})();
+
 var DROPDOWNS = safeJSON('tms_dropdowns', {
   'Job Type': ['10W','6W','4W','Pickup Truck','Crane Truck'],
   'Customer': ['KUKA Thailand','Toyota Tsusho','Denso Thailand','Bridgestone','MSI Logistics','Honda Ayutthaya','PTT Chemical','Central Group','Isuzu','Aapico Hitech'],
@@ -722,20 +730,8 @@ function normalizeJob(j) {
     return v;
   }
   return {
-    // Normalize job ID — rename any TMS-XXXXXX to Order format
-    JobID: (function() {
-      var id = get(['JobID','jobId','jobID','job_id','id','OrderID','orderId']);
-      // Convert TMS-YYMMDD-NNN style to OrderYYMMDDNNNN style
-      if(id && /^TMS-/i.test(id)) {
-        var parts = id.replace(/^TMS-/i,'').split('-');
-        if(parts.length >= 2) {
-          var datePart = parts[0]; // e.g. 260710
-          var numPart  = parts[1]; // e.g. 913
-          return 'Order' + datePart + String(parseInt(numPart)||0).padStart(4,'0');
-        }
-      }
-      return id;
-    })(),
+    // Keep job ID exactly as stored — no renaming to avoid duplicates
+    JobID: get(['JobID','jobId','jobID','job_id','id','OrderID','orderId']),
     RefNo:             get(['RefNo','refNo','ref_no','MSIJobNo','msiJobNo']),
     Customer:          get(['Customer','customer']),
     ShortDesc:         get(['ShortDesc','shortDesc','short_desc','Description','description']),
@@ -836,11 +832,28 @@ function mergeJobs(cached, apiJobs) {
 
   // Filter out deleted IDs before merging
   var delIds = getDeletedIds();
+  // Build alternate ID map from cache (handles Order26070001 <-> TMS-260710-xxx)
+  var altIdMap = {};
+  Object.keys(cacheMap).forEach(function(id) {
+    // normalise: strip non-numeric prefix, use last 8 digits as alt key
+    var alt = id.replace(/^[A-Za-z-]+/,'').replace(/-/g,'');
+    if(alt.length >= 6) altIdMap[alt.slice(-8)] = id;
+  });
+
   // For each API job, normalize it and merge with cached version
   apiJobs.forEach(function(apiJob) {
     var norm = normalizeJob(apiJob);
     if(!norm || !norm.JobID) return;
     if(delIds.indexOf(norm.JobID) >= 0) return; // skip deleted jobs
+    // Check if this API job matches a cached job under a different ID prefix
+    var alt = norm.JobID.replace(/^[A-Za-z-]+/,'').replace(/-/g,'');
+    if(alt.length >= 6) {
+      var cachedId = altIdMap[alt.slice(-8)];
+      if(cachedId && cachedId !== norm.JobID) {
+        // Same job, different ID format — use the cached (Order-prefixed) ID
+        norm.JobID = cachedId;
+      }
+    }
 
     var existing = cacheMap[norm.JobID];
     if(existing) {
@@ -967,7 +980,7 @@ function renderDashboard() {
     return '<div class="m-icon" style="background:' + color + '"><svg viewBox="0 0 24 24"><path d="' + pathD + '"/></svg></div>';
   };
   document.getElementById('dash-metrics').innerHTML =
-    '<div class="metric">' + mIcon('var(--blue)','M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2') + '<div class="m-lbl">Today\'s jobs</div><div class="m-val" style="color:var(--blue)">' + todayJobs.length + '</div></div>' +
+    '<div class="metric">' + mIcon('var(--amber)','M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z') + '<div class="m-lbl">Today\'s jobs</div><div class="m-val" style="color:var(--amber)">' + todayJobs.length + '</div></div>' +
     '<div class="metric">' + mIcon('var(--amber)','M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z') + '<div class="m-lbl">Pending (awaiting confirm)</div><div class="m-val" style="color:var(--amber)">' + pending + '</div></div>' +
     '<div class="metric">' + mIcon('var(--blue)','M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11') + '<div class="m-lbl">Confirmed</div><div class="m-val" style="color:var(--blue)">' + confirmed + '</div></div>' +
     '<div class="metric">' + mIcon('var(--green)','M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3') + '<div class="m-lbl">Consolidated trucks (all time)</div><div class="m-val" style="color:var(--green)">' + consolidatedCount + '</div></div>';
@@ -994,7 +1007,7 @@ function renderDashboard() {
     var dots = '';
     for(var di=0; di<Math.min(dayJobs.length,4); di++) {
       var st = dayJobs[di].Status;
-      var dc = st==='Confirmed'?'orange':st==='Complete'?'grn':'';
+      var dc = st==='Confirmed'?'blue':st==='Complete'?'grn':'';
       dots += '<span class="cal-dot ' + dc + '" title="' + st + ': ' + dayJobs[di].Customer + '"></span>';
     }
     var countTxt = dayJobs.length ? '<div style="font-size:10px;color:var(--blue);margin-top:3px;font-weight:600">' + dayJobs.length + ' job' + (dayJobs.length>1?'s':'') + '</div>' : '';
