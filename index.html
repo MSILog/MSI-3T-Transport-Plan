@@ -1488,10 +1488,26 @@ function doLogin() {
   err.style.display = 'none';
   if(!u || !p) { err.textContent = 'Please enter username and password.'; err.style.display = 'block'; return; }
 
+  function isActive(v) {
+    if(v === undefined || v === null) return true; // default to active if not set
+    return v === true || v === 1 || String(v).toLowerCase() === 'true';
+  }
+
   function attemptLogin() {
-    function isActive(v) { return v === true || v === 1 || String(v).toLowerCase() === 'true'; }
-    var match = USERS.find(function(usr){ return usr.username===u && usr.password===p && isActive(usr.active); });
-    if(!match) { err.textContent = 'Invalid username or password.'; err.style.display = 'block'; return; }
+    console.log('[TMS] attemptLogin USERS count:', USERS.length);
+    if(USERS.length > 0) console.log('[TMS] First user:', JSON.stringify(USERS[0]));
+    var match = USERS.find(function(usr){
+      var uMatch = usr.username === u;
+      var pMatch = usr.password === String(p);
+      var aMatch = isActive(usr.active);
+      console.log('[TMS] Checking', usr.username, '| user:', uMatch, '| pass:', pMatch, '| active:', aMatch, '(raw active:', usr.active, ')');
+      return uMatch && pMatch && aMatch;
+    });
+    if(!match) {
+      err.textContent = 'Invalid username or password.';
+      err.style.display = 'block';
+      return;
+    }
     SESSION = {role:match.role, fullName:match.fullName, username:match.username, email:match.email||''};
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
@@ -1500,12 +1516,24 @@ function doLogin() {
     try{ loadAll(); }    catch(e){ console.error('loadAll:', e); }
   }
 
-  // If API connected, fetch latest users first so cross-device login works
   if(API_URL) {
+    // Try to fetch latest users from server, but ALWAYS attempt login regardless of outcome
+    var loginDone = false;
+    var timeout = setTimeout(function() {
+      if(!loginDone) { loginDone = true; console.log('[TMS] getUsers timed out, using local'); attemptLogin(); }
+    }, 5000); // 5 second timeout fallback
+
     apiCall({action:'getUsers'}, function(res) {
+      if(loginDone) return;
+      clearTimeout(timeout);
+      loginDone = true;
+      console.log('[TMS] getUsers response:', JSON.stringify(res).slice(0,200));
       if(res && res.ok && Array.isArray(res.users) && res.users.length > 0) {
         USERS = res.users;
         saveUsers();
+        console.log('[TMS] Updated USERS from API:', USERS.length, 'users');
+      } else {
+        console.log('[TMS] getUsers failed or empty, using local USERS:', USERS.length);
       }
       attemptLogin();
     });
