@@ -1005,9 +1005,9 @@ function openDayModal(dateStr) {
         '<div style="display:flex;gap:5px">' +
           (canDispatch && j.Status==='Pending' ? '<button class="btn btn-sm btn-primary" data-jid="' + j.JobID + '" data-act="cnf">Confirm</button>' : '') +
           (canDispatch && j.Status==='Confirmed' ? '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="cmp">Complete</button>' : '') +
-          '<button class="btn btn-sm" data-jid="' + j.JobID + '" data-act="edit">Edit</button>' +
+          (SESSION.role!=='cs' || !j.CreatedBy || j.CreatedBy===SESSION.username ? '<button class="btn btn-sm" data-jid="' + j.JobID + '" data-act="edit">Edit</button>' : '') +
           (canDoc ? '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="doc">Doc</button>' : '') +
-          (canDel ? '<button class="btn btn-sm btn-red" data-jid="' + j.JobID + '" data-act="del">Delete</button>' : '') +
+          (canDel && (SESSION.role!=='cs' || j.CreatedBy===SESSION.username) ? '<button class="btn btn-sm btn-red" data-jid="' + j.JobID + '" data-act="del">Delete</button>' : '') +
         '</div>' +
       '</div>';
     }
@@ -1109,6 +1109,14 @@ function populateDDSelect(id, key, blank) {
 }
 
 function openJobModal(jobId) {
+  // CS can only edit jobs they created
+  if(jobId && SESSION.role === 'cs') {
+    var checkJob = JOBS.find(function(j){ return j.JobID === jobId; });
+    if(checkJob && checkJob.CreatedBy && checkJob.CreatedBy !== SESSION.username) {
+      toast('You can only edit orders you created.');
+      return;
+    }
+  }
   editingJobId = jobId || null;
   // Job Type now handled per-truck row via populateTruckTypeSelects()
   populateDDSelect('j-cargo-type-left','Cargo Type',null);
@@ -1172,6 +1180,13 @@ function openJobModal(jobId) {
 
 function saveJob() {
   if(!gv('j-customer') || !gv('j-start-date')) { toast('Customer and Start Date are required'); return; }
+  // CS can only edit their own jobs
+  if(editingJobId && SESSION.role === 'cs') {
+    var checkJ = JOBS.find(function(j){ return j.JobID === editingJobId; });
+    if(checkJ && checkJ.CreatedBy && checkJ.CreatedBy !== SESSION.username) {
+      toast('You can only edit orders you created.'); closeModal('modal-job'); return;
+    }
+  }
   var payload = {
     action:'saveJob', jobId: editingJobId,
     refNo:gv('j-ref'), shortDesc:gv('j-desc'), customer:gv('j-customer'),
@@ -1443,55 +1458,56 @@ function doLogin() {
   var u = document.getElementById('lu').value.trim();
   var p = document.getElementById('lp').value.trim();
   var err = document.getElementById('lerr');
+  var btn = document.getElementById('lbtn');
   err.style.display = 'none';
   if(!u || !p) { err.textContent = 'Please enter username and password.'; err.style.display = 'block'; return; }
 
   function isActive(v) {
-    if(v === undefined || v === null) return true; // default to active if not set
+    if(v === undefined || v === null) return true;
     return v === true || v === 1 || String(v).toLowerCase() === 'true';
   }
 
-  function attemptLogin() {
-    console.log('[TMS] attemptLogin USERS count:', USERS.length);
-    if(USERS.length > 0) console.log('[TMS] First user:', JSON.stringify(USERS[0]));
-    var match = USERS.find(function(usr){
-      var uMatch = usr.username === u;
-      var pMatch = usr.password === String(p);
-      var aMatch = isActive(usr.active);
-      console.log('[TMS] Checking', usr.username, '| user:', uMatch, '| pass:', pMatch, '| active:', aMatch, '(raw active:', usr.active, ')');
-      return uMatch && pMatch && aMatch;
-    });
-    if(!match) {
-      err.textContent = 'Invalid username or password.';
-      err.style.display = 'block';
-      return;
-    }
-    SESSION = {role:match.role, fullName:match.fullName, username:match.username, email:match.email||''};
+  function startSession(role, fullName, username, email) {
+    SESSION = {role:role, fullName:fullName, username:username, email:email||''};
     document.getElementById('login-page').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
-    try{ applyRole(); }  catch(e){ console.error('applyRole:', e); }
+    btn.textContent = 'Sign in'; btn.disabled = false;
+    try{ applyRole(); } catch(e){ console.error('applyRole:', e); }
     if(SESSION.role === 'cs') { goto('myjobs'); }
-    try{ loadAll(); }    catch(e){ console.error('loadAll:', e); }
+    try{ loadAll(); } catch(e){ console.error('loadAll:', e); }
   }
 
+  function localLogin() {
+    var match = USERS.find(function(usr){
+      return usr.username === u && usr.password === String(p) && isActive(usr.active);
+    });
+    if(match) {
+      startSession(match.role, match.fullName, match.username, match.email);
+    } else {
+      btn.textContent = 'Sign in'; btn.disabled = false;
+      err.textContent = 'Invalid username or password.';
+      err.style.display = 'block';
+    }
+  }
+
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+
   if(API_URL) {
-    // Try server login directly first (works across all devices)
     apiCall({action:'login', username:u, password:p}, function(res) {
       if(res && res.ok) {
-        // Server authenticated successfully
-        SESSION = {role:res.role, fullName:res.fullName, username:res.username || u, email:res.email||''};
-        document.getElementById('login-page').style.display = 'none';
-        document.getElementById('app').style.display = 'flex';
-        try{ applyRole(); } catch(e){ console.error('applyRole:', e); }
-        if(SESSION.role === 'cs') { goto('myjobs'); }
-        try{ loadAll(); } catch(e){ console.error('loadAll:', e); }
+        startSession(res.role, res.fullName, res.username || u, res.email || '');
+      } else if(res && res.error === 'Invalid username or password') {
+        // Server specifically rejected credentials — don't try local
+        btn.textContent = 'Sign in'; btn.disabled = false;
+        err.textContent = 'Invalid username or password.';
+        err.style.display = 'block';
       } else {
-        // Server said no — also try local USERS as fallback
-        attemptLogin();
+        // Server unreachable or unknown error — fall back to local
+        localLogin();
       }
     });
   } else {
-    attemptLogin();
+    localLogin();
   }
 }
 
