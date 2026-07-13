@@ -501,49 +501,6 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
     </div>
   </div>
 </div>
-    <div style="padding:20px">
-      <div style="margin-bottom:13px">
-        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Full Name *</label>
-        <input type="text" id="u-fullname" placeholder="e.g. Wapat S." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-      </div>
-      <div style="margin-bottom:13px">
-        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Username *</label>
-        <input type="text" id="u-username" placeholder="e.g. wapat" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-      </div>
-      <div style="margin-bottom:13px">
-        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Password *</label>
-        <input type="password" id="u-password" placeholder="Enter password" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-        <div style="font-size:11px;color:var(--gray);margin-top:3px">Leave blank when editing to keep existing password.</div>
-      </div>
-      <div style="margin-bottom:13px">
-        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Role *</label>
-        <select id="u-role" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-          <option value="cs">Customer Service (CS)</option>
-          <option value="transport">Transport</option>
-          <option value="admin">Admin</option>
-          <option value="management">Management</option>
-        </select>
-      </div>
-      <div style="margin-bottom:13px">
-        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Email (for job confirmed notifications)</label>
-        <input type="email" id="u-email" placeholder="email@example.com" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-        <div style="font-size:11px;color:var(--gray);margin-top:3px">When a job they created is confirmed, they receive an email automatically.</div>
-      </div>
-      <div>
-        <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Status</label>
-        <select id="u-active" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-ftr">
-      <button class="btn" id="btn-cancel-user">Cancel</button>
-      <button class="btn btn-red btn-sm" id="btn-delete-user" style="display:none;margin-right:auto">Delete User</button>
-      <button class="btn btn-primary" id="btn-save-user">Save User</button>
-    </div>
-  </div>
-</div>
 
 <!-- LOCATION MODAL -->
 <div class="overlay" id="modal-loc">
@@ -902,7 +859,8 @@ function loadAll() {
 }
 
 function doLogout() {
-  // Do NOT clear the jobs cache — all users share the same job data
+  // Save cache BEFORE clearing JOBS so data persists for next login
+  saveJobsCache();
   SESSION = null; JOBS = [];
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
@@ -1517,25 +1475,20 @@ function doLogin() {
   }
 
   if(API_URL) {
-    // Try to fetch latest users from server, but ALWAYS attempt login regardless of outcome
-    var loginDone = false;
-    var timeout = setTimeout(function() {
-      if(!loginDone) { loginDone = true; console.log('[TMS] getUsers timed out, using local'); attemptLogin(); }
-    }, 5000); // 5 second timeout fallback
-
-    apiCall({action:'getUsers'}, function(res) {
-      if(loginDone) return;
-      clearTimeout(timeout);
-      loginDone = true;
-      console.log('[TMS] getUsers response:', JSON.stringify(res).slice(0,200));
-      if(res && res.ok && Array.isArray(res.users) && res.users.length > 0) {
-        USERS = res.users;
-        saveUsers();
-        console.log('[TMS] Updated USERS from API:', USERS.length, 'users');
+    // Try server login directly first (works across all devices)
+    apiCall({action:'login', username:u, password:p}, function(res) {
+      if(res && res.ok) {
+        // Server authenticated successfully
+        SESSION = {role:res.role, fullName:res.fullName, username:res.username || u, email:res.email||''};
+        document.getElementById('login-page').style.display = 'none';
+        document.getElementById('app').style.display = 'flex';
+        try{ applyRole(); } catch(e){ console.error('applyRole:', e); }
+        if(SESSION.role === 'cs') { goto('myjobs'); }
+        try{ loadAll(); } catch(e){ console.error('loadAll:', e); }
       } else {
-        console.log('[TMS] getUsers failed or empty, using local USERS:', USERS.length);
+        // Server said no — also try local USERS as fallback
+        attemptLogin();
       }
-      attemptLogin();
     });
   } else {
     attemptLogin();
