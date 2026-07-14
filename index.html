@@ -307,6 +307,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 
       <div class="page" id="page-settings">
         <div class="page-hdr"><div class="page-title">Settings</div></div>
+        <div style="font-size:11px;color:var(--gray);margin-bottom:12px">App version: <span id="app-version-display"></span> — if devices show different orders, confirm this matches on both.</div>
         <div class="card">
           <div class="card-hdr"><span class="card-title">Google Sheets connection</span></div>
           <div class="card-body">
@@ -547,6 +548,8 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
+var APP_VERSION = '2026-07-16-tz-fix-1';
+console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
 function bkDateStr(d) {
@@ -643,6 +646,8 @@ function setApiStatus(ok) {
 // ── AUTH ───────────────────────────────────────────────
 function applyRole() {
   var r = SESSION.role;
+  var vEl = document.getElementById('app-version-display');
+  if(vEl) vEl.textContent = APP_VERSION;
   var names = {cs:'Customer Service', transport:'Transport', admin:'Admin', management:'Management'};
   document.getElementById('tnm').textContent = SESSION.fullName;
   var initials = SESSION.fullName.split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
@@ -694,8 +699,14 @@ function normalizeJob(j) {
   function getTime(keys) {
     var v = get(keys);
     if(!v) return '';
-    var m = v.match(/T(\d{2}:\d{2})/);
-    if(m) return m[1];
+    // Full ISO datetime (e.g. from Sheets Time serial anchored to 1899-12-30, or any
+    // UTC-anchored timestamp) — convert to Bangkok local time, never read the raw UTC hour
+    if(/^\d{4}-\d{2}-\d{2}T/.test(v)) {
+      var parsed = new Date(v);
+      if(!isNaN(parsed.getTime())) return bkTimeStr(parsed);
+      var m = v.match(/T(\d{2}:\d{2})/);
+      return m ? m[1] : '';
+    }
     if(/^\d{2}:\d{2}/.test(v)) return v.slice(0,5);
     return v;
   }
