@@ -143,6 +143,8 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 .lc-err{background:var(--red-l);color:var(--red);padding:8px 11px;border-radius:var(--r);font-size:13px;margin-top:10px;display:none}
 .api-dot{width:7px;height:7px;border-radius:50%;background:#6B7280;flex-shrink:0}
 .api-dot.ok{background:#22c55e}.api-dot.err{background:var(--red)}
+@keyframes tms-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.spinning{animation:tms-spin .7s linear}
 .page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .page-title{font-size:20px;font-weight:600;color:var(--navy)}
 .page-sub{font-size:13px;color:var(--gray);margin-top:2px}
@@ -177,6 +179,10 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
     <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:rgba(255,255,255,.5)">
       <div class="api-dot" id="api-dot"></div><span id="api-st">Demo mode</span>
     </div>
+    <button id="btn-refresh" title="Refresh data" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">
+      <svg id="refresh-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform .5s"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      Refresh
+    </button>
     <div class="t-right">
       <div class="t-user">
         <div class="t-av" id="tav">--</div>
@@ -696,8 +702,8 @@ function normalizeJob(j) {
     Status:            get(['Status','status']) || 'Pending',
     ConsolidationGroup: get(['ConsolidationGroup','consolidationGroup','consolidation_group']),
     CreatedBy:         get(['CreatedBy','createdBy','created_by']),
-    CreatedAt:         getDate(['CreatedAt','createdAt','created_at']),
-    UpdatedAt:         getDate(['UpdatedAt','updatedAt','updated_at']),
+    CreatedAt:         get(['CreatedAt','createdAt','created_at']),
+    UpdatedAt:         get(['UpdatedAt','updatedAt','updated_at']),
     UploadedFiles: (function() {
       var f = j.UploadedFiles || j.uploadedFiles;
       if(!f) return [];
@@ -2075,6 +2081,30 @@ document.getElementById('lbtn').addEventListener('click', doLogin);
 document.getElementById('lu').addEventListener('keydown', function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('lp').addEventListener('keydown', function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('btn-logout').addEventListener('click', doLogout);
+document.getElementById('btn-refresh').addEventListener('click', function() {
+  var icon = document.getElementById('refresh-icon');
+  var btn = document.getElementById('btn-refresh');
+  icon.classList.remove('spinning'); void icon.offsetWidth; icon.classList.add('spinning');
+  btn.disabled = true;
+  if(!API_URL) {
+    setTimeout(function(){ btn.disabled=false; toast('Not connected to server'); }, 400);
+    return;
+  }
+  apiCall({action:'getJobs'}, function(res) {
+    btn.disabled = false;
+    if(res && res.ok && Array.isArray(res.jobs)) {
+      var merged = mergeJobs(JOBS, res.jobs);
+      JOBS = merged;
+      saveJobsCache();
+      setApiStatus(true);
+      renderAll();
+      toast('Updated — ' + JOBS.length + ' jobs');
+    } else {
+      setApiStatus(false);
+      toast('Refresh failed — check connection');
+    }
+  });
+});
 
 document.getElementById('j-return-point').addEventListener('input', function(){
   var val = this.value.trim();
