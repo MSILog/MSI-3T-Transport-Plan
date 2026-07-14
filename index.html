@@ -845,10 +845,20 @@ function mergeJobs(cached, apiJobs) {
     }
 
     if(ex) {
-      // Enrich API data with any locally-known fields it's missing, but API status wins
+      // Decide whose Status/UpdatedAt is more current — don't blindly trust
+      // the server, because a background poll can race ahead of a write
+      // that's still being processed and revert a just-made local change
+      // (e.g. confirming a job, then the dot flips back to Pending until
+      // a later refresh catches up). Whichever side has the newer
+      // UpdatedAt timestamp wins.
+      var exTime  = ex.UpdatedAt  ? new Date(ex.UpdatedAt).getTime()  : 0;
+      var normTime = norm.UpdatedAt ? new Date(norm.UpdatedAt).getTime() : 0;
+      var localIsNewer = exTime > normTime;
+
       result.push(Object.assign({}, ex, {
         JobID: norm.JobID, // always use server's ID as canonical
-        Status: norm.Status || ex.Status,
+        Status: localIsNewer ? ex.Status : (norm.Status || ex.Status),
+        UpdatedAt: localIsNewer ? ex.UpdatedAt : (norm.UpdatedAt || ex.UpdatedAt),
         StartDate: norm.StartDate || ex.StartDate,
         StartTime: norm.StartTime || ex.StartTime,
         Customer:  norm.Customer  || ex.Customer,
@@ -1552,6 +1562,16 @@ function doLogin() {
     if(SESSION.role === 'cs') { goto('myjobs'); }
     try{ loadAll(); } catch(e){ console.error('loadAll:', e); }
     startAutoSync();
+    // Enrich USERS with the full list from the server (background, non-blocking)
+    // so email-notification lookups work for every user, not just the 4 defaults
+    if(API_URL) {
+      apiCall({action:'getUsers'}, function(res) {
+        if(res && res.ok && Array.isArray(res.users) && res.users.length > 0) {
+          USERS = res.users;
+          saveUsers();
+        }
+      });
+    }
   }
 
   function localLogin() {
