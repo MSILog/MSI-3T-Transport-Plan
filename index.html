@@ -827,13 +827,16 @@ function mergeJobs(cached, apiJobs) {
   });
 
   // The API response is authoritative for which jobs EXIST.
-  // Any job that disappeared from the server (deleted by any device) is dropped here.
+  // If the server currently has this job, it exists — full stop. We do NOT
+  // filter by the local deletedIds list here, because Job IDs can be reused
+  // after a deletion (the ID counter is based on current row count), and a
+  // brand-new unrelated job could otherwise be permanently hidden by a stale
+  // deletion record for a different job that used to have the same ID.
   var result = [];
   var seenIds = {};
 
   (apiJobs || []).map(normalizeJob).forEach(function(norm) {
     if(!norm || !norm.JobID) return;
-    if(delIds.indexOf(norm.JobID) >= 0) return;
 
     var ex = cacheById[norm.JobID];
     if(!ex) {
