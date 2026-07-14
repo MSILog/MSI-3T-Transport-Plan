@@ -770,54 +770,52 @@ function mergeJobs(cached, apiJobs) {
     return cust + '|' + date;
   }
 
-  // Start with cached jobs (best field data, correct IDs) — skip temp local jobs
-  var result = [];
-  var usedIds = {};
-  var usedFPs = {};
-
+  // Index cached jobs for enrichment lookups
+  var cacheById = {};
+  var cacheByFP = {};
   (cached || []).forEach(function(j) {
     if(!j.JobID) return;
-    if(j._local) return;  // skip temp jobs not yet confirmed by server
-    if(delIds.indexOf(j.JobID) >= 0) return;
-    result.push(j);
-    usedIds[j.JobID] = result.length - 1;
+    cacheById[j.JobID] = j;
     var fp = fingerprint(j);
-    if(fp !== '|') usedFPs[fp] = result.length - 1;
+    if(fp !== '|') cacheByFP[fp] = j;
   });
 
-  // Merge API jobs — update existing, skip duplicates, add genuinely new ones
+  // The API response is authoritative for which jobs EXIST.
+  // Any job that disappeared from the server (deleted by any device) is dropped here.
+  var result = [];
+  var seenIds = {};
+
   (apiJobs || []).map(normalizeJob).forEach(function(norm) {
     if(!norm || !norm.JobID) return;
     if(delIds.indexOf(norm.JobID) >= 0) return;
 
-    var idx = usedIds[norm.JobID];
-
-    // Fingerprint match — same customer+date already in cache under a different ID
-    if(idx === undefined) {
+    var ex = cacheById[norm.JobID];
+    if(!ex) {
       var fp = fingerprint(norm);
-      if(fp !== '|' && usedFPs[fp] !== undefined) {
-        idx = usedFPs[fp]; // treat as same job
-      }
+      if(fp !== '|') ex = cacheByFP[fp];
     }
 
-    if(idx !== undefined) {
-      // Update status from API; keep all other fields from cache
-      var ex = result[idx];
-      result[idx] = Object.assign({}, ex, {
+    if(ex) {
+      // Enrich API data with any locally-known fields it's missing, but API status wins
+      result.push(Object.assign({}, ex, {
+        JobID: norm.JobID, // always use server's ID as canonical
         Status: norm.Status || ex.Status,
-        // Fill in any fields the cache is missing
-        StartDate: ex.StartDate || norm.StartDate,
-        StartTime: ex.StartTime || norm.StartTime,
-        Customer:  ex.Customer  || norm.Customer,
-        PickupLocation:  ex.PickupLocation  || norm.PickupLocation,
-        DeliveryLocation: ex.DeliveryLocation || norm.DeliveryLocation
-      });
+        StartDate: norm.StartDate || ex.StartDate,
+        StartTime: norm.StartTime || ex.StartTime,
+        Customer:  norm.Customer  || ex.Customer,
+        PickupLocation:  norm.PickupLocation  || ex.PickupLocation,
+        DeliveryLocation: norm.DeliveryLocation || ex.DeliveryLocation
+      }));
     } else {
-      // Genuinely new job from API
       result.push(norm);
-      usedIds[norm.JobID] = result.length - 1;
-      var fp2 = fingerprint(norm);
-      if(fp2 !== '|') usedFPs[fp2] = result.length - 1;
+    }
+    seenIds[norm.JobID] = true;
+  });
+
+  // Keep any local jobs still waiting for server confirmation (_local flag)
+  (cached || []).forEach(function(j) {
+    if(j._local && j.JobID && !seenIds[j.JobID] && delIds.indexOf(j.JobID) < 0) {
+      result.push(j);
     }
   });
 
@@ -835,17 +833,10 @@ function loadAll() {
 
   if(API_URL) {
     apiCall({action:'getJobs'}, function(res) {
-      if(res && res.ok && Array.isArray(res.jobs) && res.jobs.length > 0) {
-        console.log('[TMS] API raw keys:', Object.keys(res.jobs[0]).join(', '));
+      if(res && res.ok && Array.isArray(res.jobs)) {
         var merged = mergeJobs(cached, res.jobs);
-        console.log('[TMS] Merged jobs:', merged.length, 'First StartDate:', merged.length ? merged[0].StartDate : 'n/a');
-        if(merged.length >= 0) {
-          JOBS = merged;
-          saveJobsCache();
-        }
-        setApiStatus(true);
-      } else if(res && res.ok) {
-        // Connected but zero rows returned — keep cache
+        JOBS = merged;
+        saveJobsCache();
         setApiStatus(true);
       } else {
         setApiStatus(false);
@@ -859,9 +850,47 @@ function loadAll() {
   }
 }
 
+// Silent background refresh — same as loadAll but no cache-flash, used for polling
+function silentRefresh() {
+  if(!API_URL || !SESSION) return;
+  var cached = JOBS.slice();
+  apiCall({action:'getJobs'}, function(res) {
+    if(res && res.ok && Array.isArray(res.jobs)) {
+      var merged = mergeJobs(cached, res.jobs);
+      // Only re-render if something actually changed, to avoid disrupting the user
+      var changed = JSON.stringify(merged.map(function(j){return j.JobID+j.Status+j.UpdatedAt;}).sort()) !==
+                    JSON.stringify(cached.map(function(j){return j.JobID+j.Status+j.UpdatedAt;}).sort());
+      JOBS = merged;
+      saveJobsCache();
+      setApiStatus(true);
+      if(changed) renderAll();
+    } else {
+      setApiStatus(false);
+    }
+  });
+}
+
+// Poll for updates every 15 seconds so all devices stay in sync
+var SYNC_INTERVAL = null;
+function startAutoSync() {
+  if(SYNC_INTERVAL) clearInterval(SYNC_INTERVAL);
+  SYNC_INTERVAL = setInterval(function() {
+    if(SESSION && API_URL && document.visibilityState === 'visible') silentRefresh();
+  }, 15000);
+}
+
+// Also refresh immediately when the tab/window regains focus
+document.addEventListener('visibilitychange', function() {
+  if(document.visibilityState === 'visible' && SESSION && API_URL) silentRefresh();
+});
+window.addEventListener('focus', function() {
+  if(SESSION && API_URL) silentRefresh();
+});
+
 function doLogout() {
   // Save cache BEFORE clearing JOBS so data persists for next login
   saveJobsCache();
+  if(SYNC_INTERVAL) { clearInterval(SYNC_INTERVAL); SYNC_INTERVAL = null; }
   SESSION = null; JOBS = [];
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
@@ -1476,6 +1505,7 @@ function doLogin() {
     try{ applyRole(); } catch(e){ console.error('applyRole:', e); }
     if(SESSION.role === 'cs') { goto('myjobs'); }
     try{ loadAll(); } catch(e){ console.error('loadAll:', e); }
+    startAutoSync();
   }
 
   function localLogin() {
