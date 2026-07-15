@@ -8,7 +8,6 @@
 <meta http-equiv="Expires" content="0">
 <title>MSI-3T Order Planning</title>
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;background:#f0f2f5;color:#1a1a2e}
@@ -548,7 +547,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-autolink-attachments-1';
+var APP_VERSION = '2026-07-16-newtab-viewer-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -1152,7 +1151,7 @@ function openDayModal(dateStr) {
             if(fEntry) {
               closeModal('modal-day');
               if(fEntry.fileData) openFileViewer(fEntry.fileData, fEntry.fileName);
-              else if(fEntry.driveUrl) openFileViewer(fEntry.driveUrl, fEntry.fileName, fEntry.downloadUrl);
+              else if(fEntry.driveUrl) window.open(fEntry.driveUrl, '_blank');
               else toast('File not available yet — still uploading on the other device.');
             }
           }
@@ -1829,11 +1828,7 @@ function completeJob(jobId) {
   renderAll();
 }
 
-// -- PDF UPLOAD & AUTO-FILL --
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
-
+// -- FILE UPLOAD --
 function resetUploadSlots() {
   UPLOADED_FILES = [];
   var statusEl = document.getElementById('status-additional');
@@ -1863,8 +1858,9 @@ function renderUploadedFiles() {
         preview = '<iframe src="'+f.fileData+'" style="width:100%;height:220px;border:1px solid var(--border);border-radius:var(--r);margin-top:6px;pointer-events:none"></iframe>';
       }
     } else if(f.driveUrl) {
-      // File from another device — no local base64, preview via Drive
-      preview = '<iframe src="'+f.driveUrl+'" style="width:100%;height:220px;border:1px solid var(--border);border-radius:var(--r);margin-top:6px;pointer-events:none"></iframe>';
+      // File from another device — no local base64. Drive's embed preview is
+      // unreliable across accounts/domains, so just link out instead.
+      preview = '<div style="margin-top:6px;padding:10px;text-align:center;background:#fff;border:1px dashed var(--border);border-radius:var(--r);font-size:12px;color:var(--gray)">Click View to open this file</div>';
     }
     var statusBadge = '';
     if(f.uploading) statusBadge = '<span style="font-size:10px;color:var(--amber);white-space:nowrap">Uploading...</span>';
@@ -1884,82 +1880,6 @@ function renderUploadedFiles() {
   });
   html += '</div>';
   statusEl.innerHTML = html;
-}
-
-function extractTextFromPDF(file, callback) {
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var typedArray = new Uint8Array(e.target.result);
-    if(typeof pdfjsLib === 'undefined') { callback(''); return; }
-    pdfjsLib.getDocument({data: typedArray}).promise.then(function(pdf) {
-      var pagePromises = [];
-      for(var i=1; i<=pdf.numPages; i++) {
-        pagePromises.push(pdf.getPage(i).then(function(page){
-          return page.getTextContent().then(function(tc){
-            return tc.items.map(function(it){return it.str;}).join(' ');
-          });
-        }));
-      }
-      Promise.all(pagePromises).then(function(texts){ callback(texts.join('\n')); });
-    }).catch(function(err){ console.error('PDF read error:', err); callback(''); });
-  };
-  reader.readAsArrayBuffer(file);
-}
-
-// Parse common shipping-document fields out of raw PDF text
-function parseShippingText(text) {
-  var f = {};
-  var dateMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/);
-  if(dateMatch) f.date = dateMatch[1];
-
-  var refMatch = text.match(/(?:Ref\.?\s*No\.?|Reference|Job\s*No\.?)[:\s]+([A-Za-z0-9\/\-]+)/i);
-  if(refMatch) f.refNo = refMatch[1];
-
-  var custMatch = text.match(/(?:Customer|Shipper|Consignee)[:\s]+([^\n]{3,60})/i);
-  if(custMatch) f.customer = custMatch[1].trim();
-
-  var pickupMatch = text.match(/(?:Pick\s*up|Origin|From|Place of Pick up)[:\s]+([^\n]{3,80})/i);
-  if(pickupMatch) f.pickup = pickupMatch[1].trim();
-
-  var deliveryMatch = text.match(/(?:Deliver(?:y)?|Destination|To|Place of Delivery)[:\s]+([^\n]{3,80})/i);
-  if(deliveryMatch) f.delivery = deliveryMatch[1].trim();
-
-  var weightMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:kg|KG|Kgs)/i);
-  if(weightMatch) f.weight = weightMatch[1];
-
-  var piecesMatch = text.match(/(\d+)\s*(?:pcs|Pieces|PKGS|packages)/i);
-  if(piecesMatch) f.pieces = piecesMatch[1];
-
-  var contactMatch = text.match(/(?:Contact|Attn|Tel)[:\s]+([^\n]{3,50})/i);
-  if(contactMatch) f.contact = contactMatch[1].trim();
-
-  return f;
-}
-
-function applyParsedFieldsToForm(fields) {
-  var applied = [];
-  if(fields.refNo && !gv('j-ref')) { sv('j-ref', fields.refNo); applied.push('Ref no.'); }
-  if(fields.customer && !gv('j-customer')) { sv('j-customer', fields.customer); applied.push('Customer'); }
-  if(fields.date && !gv('j-start-date')) {
-    var parts = fields.date.split(/[\/\-]/);
-    if(parts.length===3) {
-      var y = parts[2].length===2 ? '20'+parts[2] : parts[2];
-      var iso = y + '-' + parts[1].padStart(2,'0') + '-' + parts[0].padStart(2,'0');
-      sv('j-start-date', iso); applied.push('Start Date');
-    }
-  }
-  if(fields.pickup && !gv('j-pickup-manual')) { sv('j-pickup-manual', fields.pickup); applied.push('Pickup Point'); }
-  if(fields.delivery) {
-    var dpRows = document.querySelectorAll('#delivery-points .dp-row');
-    if(!dpRows.length) {
-      addDeliveryPointWithVal(fields.delivery);
-      applied.push('Delivery Point');
-    }
-  }
-  if(fields.weight && !gv('j-kgs')) { sv('j-kgs', fields.weight); applied.push('KGS'); }
-  if(fields.pieces && !gv('j-kgs')) { sv('j-kgs', fields.pieces); applied.push('KGS'); }
-  if(fields.contact && !gv('j-pickup-contact')) { sv('j-pickup-contact', fields.contact); applied.push('Contact person pickup'); }
-  return applied;
 }
 
 function uploadEntryToDrive(entry) {
@@ -2012,37 +1932,15 @@ function handleUploadFiles(files) {
     var reader = new FileReader();
     reader.onload = function(e) {
       var base64 = e.target.result;
-      var isPDF = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
-      var entry = {fileName: file.name, fileData: base64, rawText: '', parsedFields: {}, uploading: true};
+      var entry = {fileName: file.name, fileData: base64, uploading: true};
       UPLOADED_FILES.push(entry);
       renderUploadedFiles();
 
       // Kick off Drive upload in the background so other users can see this file too
       uploadEntryToDrive(entry);
 
-      if(isPDF) {
-        extractTextFromPDF(file, function(text) {
-          console.log('[TMS] PDF text extracted for', file.name, '— length:', text.length, '| preview:', text.slice(0,150));
-          entry.rawText = text.slice(0,2000);
-          entry.parsedFields = parseShippingText(text);
-          console.log('[TMS] Parsed fields:', JSON.stringify(entry.parsedFields));
-          done++;
-          renderUploadedFiles();
-          if(done === total) {
-            var applied = applyParsedFieldsToForm(entry.parsedFields);
-            if(!text.length) {
-              toast(file.name + ' uploaded — could not read text (may be a scanned image)');
-            } else if(!applied.length) {
-              toast(file.name + ' uploaded — no matching fields found to auto-fill');
-            } else {
-              toast(file.name + ' uploaded — auto-filled: ' + applied.join(', '));
-            }
-          }
-        });
-      } else {
-        done++;
-        if(done === total) toast(total + ' file(s) uploaded');
-      }
+      done++;
+      if(done === total) toast(total + ' file(s) uploaded');
     };
     reader.readAsDataURL(file);
   });
@@ -2433,7 +2331,7 @@ document.addEventListener('click', function(e) {
     var fi = parseInt(t.getAttribute('data-fi')||'0');
     var f = UPLOADED_FILES[fi];
     if(f && f.fileData) openFileViewer(f.fileData, f.fileName);
-    else if(f && f.driveUrl) openFileViewer(f.driveUrl, f.fileName, f.downloadUrl);
+    else if(f && f.driveUrl) window.open(f.driveUrl, '_blank');
   }
   if(t && t.getAttribute('data-act') === 'rm-file') {
     var fi2 = parseInt(t.getAttribute('data-fi')||'0');
@@ -2449,7 +2347,7 @@ document.addEventListener('click', function(e) {
     var fi3 = parseInt(t.getAttribute('data-fi')||'0');
     var f3 = UPLOADED_FILES[fi3];
     if(f3 && f3.fileData) openFileViewer(f3.fileData, f3.fileName);
-    else if(f3 && f3.driveUrl) openFileViewer(f3.driveUrl, f3.fileName, f3.downloadUrl);
+    else if(f3 && f3.driveUrl) window.open(f3.driveUrl, '_blank');
   }
 });
 
