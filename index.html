@@ -547,7 +547,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-newtab-viewer-1';
+var APP_VERSION = '2026-07-16-day-date-prefill-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -1089,7 +1089,9 @@ function renderDashboard() {
   }
 }
 
+var CURRENT_DAY_DATE = null;
 function openDayModal(dateStr) {
+  CURRENT_DAY_DATE = dateStr;
   var dayJobs = JOBS.filter(function(j){return j.StartDate===dateStr;});
   var d = new Date(dateStr + 'T12:00:00');
   document.getElementById('day-modal-title').textContent = 'Jobs — ' + d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -1231,7 +1233,7 @@ function populateDDSelect(id, key, blank) {
   el.innerHTML = html;
 }
 
-function openJobModal(jobId) {
+function openJobModal(jobId, presetDate) {
   // CS can only edit jobs they created
   if(jobId && SESSION.role === 'cs') {
     var checkJob = JOBS.find(function(j){ return j.JobID === jobId; });
@@ -1252,7 +1254,7 @@ function openJobModal(jobId) {
     LOCATIONS.forEach(function(loc){ lh+='<option value="'+loc.name+'">'; });
     locDL.innerHTML=lh;
   }
-  var today = bkDateStr();
+  var today = presetDate || bkDateStr();
   if(!jobId) {
     document.getElementById('mj-title').textContent = 'Manage Job \u00bb Add';
     var cbEl2 = document.getElementById('mj-created-by'); if(cbEl2) cbEl2.textContent = '';
@@ -2224,7 +2226,7 @@ document.getElementById('btn-close-job').addEventListener('click', function(){cl
 
 document.getElementById('btn-close-day').addEventListener('click', function(){closeModal('modal-day');});
 document.getElementById('btn-close-day2').addEventListener('click', function(){closeModal('modal-day');});
-document.getElementById('btn-new-from-day').addEventListener('click', function(){closeModal('modal-day');openJobModal(null);});
+document.getElementById('btn-new-from-day').addEventListener('click', function(){closeModal('modal-day');openJobModal(null, CURRENT_DAY_DATE);});
 
 document.getElementById('btn-close-pdf').addEventListener('click', function(){closeModal('modal-pdf');});
 document.getElementById('btn-cancel-pdf').addEventListener('click', function(){closeModal('modal-pdf');});
