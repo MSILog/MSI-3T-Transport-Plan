@@ -548,7 +548,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-drive-attachments-1';
+var APP_VERSION = '2026-07-16-upload-diagnostics-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -710,6 +710,13 @@ function normalizeJob(j) {
     if(/^\d{2}:\d{2}/.test(v)) return v.slice(0,5);
     return v;
   }
+  function normalizeStatus(v) {
+    var s = String(v||'').trim().toLowerCase();
+    if(s === 'pending') return 'Pending';
+    if(s === 'confirmed') return 'Confirmed';
+    if(s === 'complete' || s === 'completed') return 'Complete';
+    return v ? String(v).trim() : 'Pending';
+  }
   return {
     // Keep job ID exactly as stored — no renaming to avoid duplicates
     JobID: get(['JobID','jobId','jobID','job_id','id','OrderID','orderId']),
@@ -739,7 +746,7 @@ function normalizeJob(j) {
     Amount:            get(['Amount','amount']),
     DriverDetails:     get(['DriverDetails','driverDetails','driver_details','Driver','driver','DriverName','driverName']),
     Remark:            get(['Remark','remark','notes','Notes','Remarks']),
-    Status:            get(['Status','status']) || 'Pending',
+    Status:            normalizeStatus(get(['Status','status'])),
     ConsolidationGroup: get(['ConsolidationGroup','consolidationGroup','consolidation_group']),
     CreatedBy:         get(['CreatedBy','createdBy','created_by']),
     CreatedAt:         get(['CreatedAt','createdAt','created_at']),
@@ -1861,12 +1868,14 @@ function renderUploadedFiles() {
     }
     var statusBadge = '';
     if(f.uploading) statusBadge = '<span style="font-size:10px;color:var(--amber);white-space:nowrap">Uploading...</span>';
-    else if(f.uploadError) statusBadge = '<span style="font-size:10px;color:var(--red);white-space:nowrap">Upload failed</span>';
-    else if(f.driveUrl || f.fileData) statusBadge = '<span style="font-size:10px;color:var(--green);white-space:nowrap">Synced</span>';
+    else if(f.uploadError) statusBadge = '<span style="font-size:10px;color:var(--red);white-space:nowrap">Upload failed — click to retry</span>';
+    else if(f.driveUrl) statusBadge = '<span style="font-size:10px;color:var(--green);white-space:nowrap">Synced — visible to everyone</span>';
+    else if(f.fileData) statusBadge = '<span style="font-size:10px;color:var(--amber);white-space:nowrap">Local only — not yet synced</span>';
     html += '<div style="background:#f9fafb;border:1px solid var(--border);border-radius:var(--r);padding:8px 10px">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
         '<span style="font-size:12px;font-weight:500;flex:1">&#x1F4CE; '+f.fileName+'</span>' +
         statusBadge +
+        (f.uploadError ? '<button class="btn btn-sm" style="padding:2px 8px;font-size:11px" data-fi="'+i+'" data-act="retry-upload">Retry</button>' : '') +
         ((f.fileData || f.driveUrl) ? '<button class="btn btn-sm btn-view-upload" style="padding:2px 8px;font-size:11px" data-fi="'+i+'">View</button>' : '') +
         '<button class="btn btn-sm" style="padding:2px 8px;font-size:11px;color:var(--red);border-color:var(--red)" data-fi="'+i+'" data-act="rm-file">&#x2715;</button>' +
       '</div>' +
@@ -1953,6 +1962,29 @@ function applyParsedFieldsToForm(fields) {
   return applied;
 }
 
+function uploadEntryToDrive(entry) {
+  if(!API_URL) { entry.uploading = false; return; }
+  entry.uploading = true;
+  entry.uploadError = false;
+  renderUploadedFiles();
+  console.log('[TMS] Starting Drive upload for', entry.fileName, '| base64 length:', (entry.fileData||'').length);
+  apiCall({action:'uploadFile', fileData:entry.fileData, fileName:entry.fileName}, function(res) {
+    entry.uploading = false;
+    console.log('[TMS] Drive upload response for', entry.fileName, ':', JSON.stringify(res).slice(0,300));
+    if(res && res.ok && res.url) {
+      entry.driveUrl = res.url;
+      entry.downloadUrl = res.downloadUrl;
+      entry.fileId = res.fileId;
+      entry.uploadError = false;
+    } else {
+      entry.uploadError = true;
+      console.error('[TMS] File upload to Drive FAILED for', entry.fileName, '— reason:', (res && res.error) || 'no response / network error');
+      toast('Upload failed for ' + entry.fileName + (res && res.error ? ': ' + res.error : ''));
+    }
+    renderUploadedFiles();
+  });
+}
+
 function handleUploadFiles(files) {
   var total = files.length;
   var done = 0;
@@ -1966,32 +1998,25 @@ function handleUploadFiles(files) {
       renderUploadedFiles();
 
       // Kick off Drive upload in the background so other users can see this file too
-      if(API_URL) {
-        apiCall({action:'uploadFile', fileData:base64, fileName:file.name}, function(res) {
-          entry.uploading = false;
-          if(res && res.ok && res.url) {
-            entry.driveUrl = res.url;
-            entry.downloadUrl = res.downloadUrl;
-            entry.fileId = res.fileId;
-          } else {
-            entry.uploadError = true;
-            console.error('[TMS] File upload to Drive failed:', res && res.error);
-          }
-          renderUploadedFiles();
-        });
-      } else {
-        entry.uploading = false;
-      }
+      uploadEntryToDrive(entry);
 
       if(isPDF) {
         extractTextFromPDF(file, function(text) {
+          console.log('[TMS] PDF text extracted for', file.name, '— length:', text.length, '| preview:', text.slice(0,150));
           entry.rawText = text.slice(0,2000);
           entry.parsedFields = parseShippingText(text);
+          console.log('[TMS] Parsed fields:', JSON.stringify(entry.parsedFields));
           done++;
           renderUploadedFiles();
           if(done === total) {
             var applied = applyParsedFieldsToForm(entry.parsedFields);
-            toast(file.name + ' uploaded' + (applied.length ? ' — auto-filled: ' + applied.join(', ') : ''));
+            if(!text.length) {
+              toast(file.name + ' uploaded — could not read text (may be a scanned image)');
+            } else if(!applied.length) {
+              toast(file.name + ' uploaded — no matching fields found to auto-fill');
+            } else {
+              toast(file.name + ' uploaded — auto-filled: ' + applied.join(', '));
+            }
           }
         });
       } else {
@@ -2394,6 +2419,11 @@ document.addEventListener('click', function(e) {
     var fi2 = parseInt(t.getAttribute('data-fi')||'0');
     UPLOADED_FILES.splice(fi2, 1);
     renderUploadedFiles();
+  }
+  if(t && t.getAttribute('data-act') === 'retry-upload') {
+    var fi4 = parseInt(t.getAttribute('data-fi')||'0');
+    var f4 = UPLOADED_FILES[fi4];
+    if(f4) uploadEntryToDrive(f4);
   }
   if(t && t.classList.contains('file-preview-img')) {
     var fi3 = parseInt(t.getAttribute('data-fi')||'0');
