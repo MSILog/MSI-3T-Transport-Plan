@@ -88,10 +88,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
 .modal-hdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:#fafafa;border-radius:var(--r-lg) var(--r-lg) 0 0}
 .modal-title{font-size:15px;font-weight:600;color:var(--navy)}
 .modal-ftr{padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:#fafafa;border-radius:0 0 var(--r-lg) var(--r-lg)}
-.mj-tab-bar{display:flex;border-bottom:2px solid var(--border);padding:0 20px;background:#fff}
-.mj-tab{display:flex;align-items:center;gap:6px;padding:10px 16px;font-size:13px;font-weight:500;color:var(--gray);border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer}
-.mj-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
-.mj-tab svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
+
 .mj-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:8px 20px 16px}
 .mj-col{padding:4px 8px}
 .mj-col-divider{border-left:1px solid var(--border)}
@@ -243,6 +240,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
         <div class="page-hdr">
           <div><div class="page-title">Job Orders</div></div>
           <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="jobs-search" placeholder="Search MSI Job No. or Customer..." style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px;width:220px">
             <select id="jobs-filter" style="padding:6px 10px;border:1px solid var(--border);border-radius:var(--r);font-size:13px">
               <option value="">All statuses</option>
               <option>Pending</option><option>Confirmed</option><option>Complete</option>
@@ -370,12 +368,6 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
       <button class="btn btn-sm btn-icon" id="btn-close-job">✕</button>
     </div>
     <div>
-      <div class="mj-tab-bar">
-        <div class="mj-tab active">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-          Job Detail
-        </div>
-      </div>
       <div class="mj-form-grid">
         <!-- ── LEFT COLUMN ── -->
         <div class="mj-col">
@@ -547,7 +539,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-day-date-prefill-1';
+var APP_VERSION = '2026-07-16-search-truckvalidation-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -1102,7 +1094,7 @@ function openDayModal(dateStr) {
     for(var i=0; i<dayJobs.length; i++) {
       var j = dayJobs[i];
       var canDispatch = SESSION.role==='transport'||SESSION.role==='admin';
-      var canDoc = canDispatch && (j.Status==='Confirmed'||j.Status==='Complete');
+      var canDoc = canDispatch;
       var canDel = canDispatch;
       var ts = j.UpdatedAt || j.CreatedAt;
       var tsLabel = '';
@@ -1167,7 +1159,14 @@ function openDayModal(dateStr) {
 // ── JOBS TABLE ─────────────────────────────────────────
 function renderJobsTable() {
   var filter = gv('jobs-filter');
+  var search = (gv('jobs-search')||'').trim().toLowerCase();
   var list = filter ? JOBS.filter(function(j){return j.Status===filter;}) : JOBS;
+  if(search) {
+    list = list.filter(function(j){
+      return (j.RefNo||'').toLowerCase().indexOf(search)>=0 ||
+             (j.Customer||'').toLowerCase().indexOf(search)>=0;
+    });
+  }
   var canDispatch = SESSION.role==='transport'||SESSION.role==='admin';
   var html = '';
   if(!list.length) {
@@ -1180,7 +1179,7 @@ function renderJobsTable() {
         '<button class="btn btn-sm btn-primary" data-jid="' + j.JobID + '" data-act="cnf">Confirm</button>' : '';
       var cmpBtn = (canDispatch && j.Status==='Confirmed') ?
         '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="cmp">Complete</button>' : '';
-      var docBtn = (canDispatch && (j.Status==='Confirmed'||j.Status==='Complete')) ?
+      var docBtn = canDispatch ?
         '<button class="btn btn-sm btn-green" data-jid="' + j.JobID + '" data-act="doc">&#x1F4C4; Doc</button>' : '';
       var delBtn = canDispatch ? '<button class="btn btn-sm btn-red" data-jid="' + j.JobID + '" data-act="del">Delete</button>' : '';
       var ts = j.UpdatedAt || j.CreatedAt || '';
@@ -1807,6 +1806,14 @@ function confirmJob(jobId) {
   var job = JOBS.find(function(j){ return j.JobID===jobId; });
   if(!job) return;
   if(job.Status !== 'Pending') { toast(jobId + ' is already ' + job.Status); return; }
+  var hasValidTruck = Array.isArray(job.Trucks) && job.Trucks.some(function(t){
+    return t && t.type && String(t.type).trim() && t.driver && String(t.driver).trim();
+  });
+  if(!hasValidTruck) {
+    toast('Transport team must fill in Job Type and Driver Details before confirming ' + jobId);
+    openJobModal(jobId);
+    return;
+  }
   if(!confirm('Confirm job ' + jobId + '? Status will change from Pending to Confirmed.')) return;
   job.Status = 'Confirmed';
   job.UpdatedAt = new Date().toISOString();
@@ -2283,6 +2290,7 @@ document.getElementById('btn-save-loc').addEventListener('click', function(){
 });
 
 document.getElementById('jobs-filter').addEventListener('change', renderJobsTable);
+document.getElementById('jobs-search').addEventListener('input', renderJobsTable);
 document.getElementById('btn-runai').addEventListener('click', function(){renderConsolidation();toast('AI analysis complete');});
 function addDeliveryPointWithVal(preselectedName) {
   var dp = document.getElementById('delivery-points');
