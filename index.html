@@ -327,12 +327,14 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           <div class="card-hdr"><span class="card-title">Consolidation rules</span></div>
           <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
             <div>
-              <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Zone matching</label>
+              <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Zone matching (distance)</label>
               <select id="zone-match" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r)">
-                <option value="province">Province only</option>
-                <option value="postal3">Postal prefix (3 digits)</option>
-                <option value="both">Province + postal</option>
+                <option value="5">Within 5 km</option>
+                <option value="15" selected>Within 15 km</option>
+                <option value="30">Within 30 km</option>
+                <option value="text">Text match only (no coordinates saved)</option>
               </select>
+              <div style="font-size:11px;color:var(--gray);margin-top:4px">Uses saved locations' coordinates. Add coordinates via Locations page for accurate matching.</div>
             </div>
             <div>
               <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Date window</label>
@@ -381,7 +383,10 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           <div class="mj-field">
             <div class="mj-fl">Pickup Point:</div>
             <div class="mj-fc">
-              <input type="text" id="j-pickup-manual" list="saved-locations-list" placeholder="Type address or select saved location">
+              <div style="display:flex;gap:6px">
+                <input type="text" id="j-pickup-manual" list="saved-locations-list" placeholder="Type address or select saved location" style="flex:1">
+                <button type="button" class="mj-btn-sm" id="btn-add-loc-pickup" title="Add a new saved location">+</button>
+              </div>
               <datalist id="saved-locations-list"></datalist>
               <div id="j-pickup-map-link" style="margin-top:4px"></div>
             </div>
@@ -394,7 +399,10 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
             <div class="mj-fl">Delivery Points:</div>
             <div class="mj-fc">
               <div id="delivery-points"></div>
-              <button class="mj-btn-green" style="margin-top:6px" id="btn-add-point">+ Add delivery point</button>
+              <div style="display:flex;gap:6px;margin-top:6px">
+                <button class="mj-btn-green" id="btn-add-point">+ Add delivery point</button>
+                <button type="button" class="mj-btn-sm" id="btn-add-loc-delivery" title="Add a new saved location">+ New Location</button>
+              </div>
             </div>
           </div>
           <div class="mj-field">
@@ -404,7 +412,10 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           <div class="mj-field">
             <div class="mj-fl">Container Return Point:</div>
             <div class="mj-fc">
-              <input type="text" id="j-return-point" list="saved-locations-list" placeholder="Type address or select saved location">
+              <div style="display:flex;gap:6px">
+                <input type="text" id="j-return-point" list="saved-locations-list" placeholder="Type address or select saved location" style="flex:1">
+                <button type="button" class="mj-btn-sm" id="btn-add-loc-return" title="Add a new saved location">+</button>
+              </div>
               <div id="j-return-map-link" style="margin-top:4px"></div>
             </div>
           </div>
@@ -521,6 +532,18 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
         <input type="url" id="loc-url" placeholder="https://maps.app.goo.gl/..." style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:monospace;font-size:12px">
         <div style="font-size:11px;color:var(--gray);margin-top:4px">Google Maps &rarr; right-click pin &rarr; "Copy link" or Share &rarr; Copy link</div>
       </div>
+      <div id="loc-coords-status" style="font-size:12px;margin:8px 0;min-height:16px"></div>
+      <div style="display:flex;gap:10px;margin-bottom:6px">
+        <div style="flex:1">
+          <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Latitude</label>
+          <input type="text" id="loc-lat" placeholder="13.7563" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:monospace;font-size:12px">
+        </div>
+        <div style="flex:1">
+          <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:5px">Longitude</label>
+          <input type="text" id="loc-lng" placeholder="100.5018" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r);font-family:monospace;font-size:12px">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--gray);margin-bottom:14px">Auto-filled from the link above when possible. If it's a shortened link (maps.app.goo.gl), open it once in a browser tab and paste the full expanded URL here instead, or fill coordinates in manually.</div>
     </div>
     <div class="modal-ftr">
       <button class="btn" id="btn-cancel-loc">Cancel</button>
@@ -539,7 +562,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-search-truckvalidation-1';
+var APP_VERSION = '2026-07-16-geocoded-consolidation-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -569,13 +592,14 @@ var currentPDFJob = null;
 var calYear = new Date().getFullYear();
 var calMonth = new Date().getMonth();
 var editingJobId = null;
+var LOC_MODAL_TARGET_FIELD = null; // tracks which job-form field to fill when Add Location is opened from within the job form
 
 function safeJSON(key, fallback) {
   try { var s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; }
   catch(e) { localStorage.removeItem(key); return fallback; }
 }
 
-var RULES = safeJSON('tms_rules', {match:'province', sameDate:'same', thresh:'75'});
+var RULES = safeJSON('tms_rules', {match:'15', sameDate:'same', thresh:'75'});
 // Clear any old cached dropdowns that had removed keys
 (function(){
   var dd = safeJSON('tms_dropdowns', null);
@@ -585,7 +609,7 @@ var RULES = safeJSON('tms_rules', {match:'province', sameDate:'same', thresh:'75
 })();
 
 var DROPDOWNS = safeJSON('tms_dropdowns', {
-  'Job Type': ['10W','6W','4W','Pickup Truck','Crane Truck'],
+  'Job Type': ['4W','4W F/B','4W Reefer','6W','6W \u0e1e\u0e48\u0e27\u0e07','6W Flatbed','6W Tailgate Hiab','10W','18W Flatbed','20 ft','40 ft','40 ft HQ'],
   'Customer': ['KUKA Thailand','Toyota Tsusho','Denso Thailand','Bridgestone','MSI Logistics','Honda Ayutthaya','PTT Chemical','Central Group','Isuzu','Aapico Hitech'],
   'Cargo Type': ['General cargo','Palletized','Fragile','Temperature controlled','Hazmat','Auto parts','Chemical']
 });
@@ -1174,7 +1198,6 @@ function renderJobsTable() {
   } else {
     for(var i=0; i<list.length; i++) {
       var j = list[i];
-      var zp = (j.DeliveryPostal||'').slice(0,3)+'xx';
       var cnfBtn = (canDispatch && j.Status==='Pending') ?
         '<button class="btn btn-sm btn-primary" data-jid="' + j.JobID + '" data-act="cnf">Confirm</button>' : '';
       var cmpBtn = (canDispatch && j.Status==='Confirmed') ?
@@ -1232,6 +1255,15 @@ function populateDDSelect(id, key, blank) {
   el.innerHTML = html;
 }
 
+function populateSavedLocationsList() {
+  var locDL = document.getElementById('saved-locations-list');
+  if(locDL) {
+    var lh='';
+    LOCATIONS.forEach(function(loc){ lh+='<option value="'+loc.name+'">'; });
+    locDL.innerHTML=lh;
+  }
+}
+
 function openJobModal(jobId, presetDate) {
   // CS can only edit jobs they created
   if(jobId && SESSION.role === 'cs') {
@@ -1247,12 +1279,7 @@ function openJobModal(jobId, presetDate) {
   populateTruckTypeSelects();
   var custDL = document.getElementById('customer-list');
   if(custDL) { var ch=''; (DROPDOWNS['Customer']||[]).forEach(function(c){ch+='<option value="'+c+'">';}); custDL.innerHTML=ch; }
-  var locDL = document.getElementById('saved-locations-list');
-  if(locDL) {
-    var lh='';
-    LOCATIONS.forEach(function(loc){ lh+='<option value="'+loc.name+'">'; });
-    locDL.innerHTML=lh;
-  }
+  populateSavedLocationsList();
   var today = presetDate || bkDateStr();
   if(!jobId) {
     document.getElementById('mj-title').textContent = 'Manage Job \u00bb Add';
@@ -1437,16 +1464,56 @@ function deleteJob(jobId) {
 }
 
 // ── AI CONSOLIDATION ───────────────────────────────────
+// Haversine distance in km between two lat/lng points
+function haversineKm(lat1, lng1, lat2, lng2) {
+  var R = 6371;
+  var dLat = (lat2-lat1) * Math.PI/180;
+  var dLng = (lng2-lng1) * Math.PI/180;
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+          Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180) *
+          Math.sin(dLng/2)*Math.sin(dLng/2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Look up a saved location's coordinates by matching its name against a job's DeliveryLocation text
+function getLocationCoords(deliveryLocationName) {
+  if(!deliveryLocationName) return null;
+  var match = LOCATIONS.find(function(l){
+    return l.name && l.name.toLowerCase().trim() === deliveryLocationName.toLowerCase().trim();
+  });
+  if(match && typeof match.lat === 'number' && typeof match.lng === 'number') {
+    return {lat: match.lat, lng: match.lng};
+  }
+  return null;
+}
+
+// Are two jobs' delivery points close enough to consolidate?
+function deliveryZoneMatch(a, b) {
+  if(RULES.match === 'text') {
+    // No coordinates available — fall back to exact text match
+    return (a.DeliveryLocation||'').toLowerCase().trim() === (b.DeliveryLocation||'').toLowerCase().trim() && !!a.DeliveryLocation;
+  }
+  var coordsA = getLocationCoords(a.DeliveryLocation);
+  var coordsB = getLocationCoords(b.DeliveryLocation);
+  if(coordsA && coordsB) {
+    var dist = haversineKm(coordsA.lat, coordsA.lng, coordsB.lat, coordsB.lng);
+    return dist <= (parseFloat(RULES.match) || 15);
+  }
+  // Missing coordinates for one or both — fall back to exact text match so we
+  // don't silently miss matches just because a location wasn't geocoded yet
+  return (a.DeliveryLocation||'').toLowerCase().trim() === (b.DeliveryLocation||'').toLowerCase().trim() && !!a.DeliveryLocation;
+}
+
 function scoreConsolidation(group) {
   var score = 60;
   var times = group.map(function(j){ var p=(j.StartTime||'00:00').split(':'); return parseInt(p[0])*60+parseInt(p[1]); });
   var diff = Math.max.apply(null,times) - Math.min.apply(null,times);
   if(diff<=60) score+=20; else if(diff<=120) score+=10; else if(diff>240) score-=15;
-  var totalPcs = group.reduce(function(s,j){return s+(parseInt(j.Pieces)||0);},0);
-  if(totalPcs>=10&&totalPcs<=60) score+=10;
-  if(group.every(function(j){return j.Area===group[0].Area;})) score+=10;
-  if(group.every(function(j){return j.DeliveryProvince===group[0].DeliveryProvince;})) score+=5;
-  if(group.some(function(j){return j.CargoType==='Hazmat';})) score-=25;
+  var totalKgs = group.reduce(function(s,j){return s+(parseFloat(j.KGS)||0);},0);
+  if(totalKgs>=100&&totalKgs<=2000) score+=10;
+  if(group.every(function(j){return (j.DeliveryLocation||'').toLowerCase().trim()===(group[0].DeliveryLocation||'').toLowerCase().trim();})) score+=10;
+  if(group.some(function(j){return (j.CargoType||'').toLowerCase()==='hazmat';})) score-=25;
   return Math.min(100, Math.max(0, score));
 }
 
@@ -1460,9 +1527,7 @@ function getConsolidationGroups() {
     for(var k=i+1; k<candidates.length; k++) {
       if(used[candidates[k].JobID]) continue;
       var a=candidates[i], b=candidates[k];
-      var mP = a.DeliveryProvince===b.DeliveryProvince;
-      var mZ = (a.DeliveryPostal||'').slice(0,3)===(b.DeliveryPostal||'').slice(0,3);
-      var zm = RULES.match==='province'?mP : RULES.match==='postal3'?mZ : (mP&&mZ);
+      var zm = deliveryZoneMatch(a, b);
       var dm = true;
       if(RULES.sameDate==='same') dm = a.StartDate===b.StartDate;
       else if(RULES.sameDate==='2days') dm = Math.abs(new Date(a.StartDate)-new Date(b.StartDate)) <= 2*86400000;
@@ -1491,26 +1556,26 @@ function renderConsolidation() {
   insightDiv.innerHTML = '<div class="insight-box"><div class="insight-title">\u2728 AI Analysis</div><ul class="insight-list">' +
     '<li>' + groups.length + ' group' + (groups.length>1?'s':'') + ' identified across ' + totalJobs + ' jobs</li>' +
     '<li>Estimated saving: \u0e3f' + saving.toLocaleString() + ' (avg \u0e3f1,800 per run)</li>' +
-    '<li>Top group \u2014 ' + groups[0].jobs[0].DeliveryProvince + ' zone \u2014 confidence ' + groups[0].score + '%</li>' +
+    '<li>Top group \u2014 ' + (groups[0].jobs[0].DeliveryLocation||'destination') + ' \u2014 confidence ' + groups[0].score + '%</li>' +
     '</ul></div>';
   var html = '';
   for(var gi=0; gi<groups.length; gi++) {
     var g = groups[gi];
-    var prov = g.jobs[0].DeliveryProvince;
-    var totalPcs = g.jobs.reduce(function(s,j){return s+(parseInt(j.Pieces)||0);},0);
+    var dest = g.jobs[0].DeliveryLocation || 'Destination';
+    var totalKgs = g.jobs.reduce(function(s,j){return s+(parseFloat(j.KGS)||0);},0);
     var times = g.jobs.map(function(j){return j.StartTime;}).join(', ');
     var sc = g.score;
     var scColor = sc>=90?'#22c55e':sc>=75?'#3b82f6':'#ea7c1e';
     var cards = '';
     for(var ji=0; ji<g.jobs.length; ji++) {
       var j = g.jobs[ji];
-      cards += '<div class="ai-job-card"><div class="ai-job-id">' + j.JobID + '</div><div class="ai-job-info">' + j.Customer + '<br>' + j.StartTime + ' \u2192 ' + j.DeliveryProvince + '<br>' + (j.Pieces||0) + ' pcs \u00b7 ' + j.CargoType + '</div></div>';
+      cards += '<div class="ai-job-card"><div class="ai-job-id">' + j.JobID + '</div><div class="ai-job-info">' + j.Customer + '<br>' + j.StartTime + ' \u2192 ' + (j.DeliveryLocation||'') + '<br>' + (j.KGS||0) + ' kgs \u00b7 ' + (j.CargoType||'') + '</div></div>';
     }
     html += '<div class="ai-banner" id="aib-' + gi + '">' +
       '<div class="ai-bh"><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' +
-      g.jobs.length + ' jobs \u00b7 ' + prov + ' \u00b7 ' + g.jobs[0].StartDate +
+      g.jobs.length + ' jobs \u00b7 ' + dest + ' \u00b7 ' + g.jobs[0].StartDate +
       '<span style="margin-left:auto;background:' + scColor + ';padding:3px 10px;border-radius:20px;font-size:12px">Score: ' + sc + '%</span></div>' +
-      '<div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:10px">Times: ' + times + ' \u00b7 ' + totalPcs + ' pcs total</div>' +
+      '<div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:10px">Times: ' + times + ' \u00b7 ' + totalKgs + ' kgs total</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' + cards + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
         '<button class="btn btn-primary btn-sm" data-gi="' + gi + '" data-act="confirm">\u2713 Confirm \u2014 same truck</button>' +
@@ -1539,7 +1604,7 @@ function confirmConsolidation(idx) {
   var grp = groups[idx].jobs;
   var groupId = 'CON-' + Date.now();
   grp.forEach(function(j) { var job=JOBS.find(function(x){return x.JobID===j.JobID;}); if(job){ if(job.Status==='Pending') job.Status='Confirmed'; job.ConsolidationGroup=groupId; } });
-  if(API_URL) apiCall({action:'saveConsolidation',groupId:groupId,jobIds:grp.map(function(j){return j.JobID;}),deliveryProvince:grp[0].DeliveryProvince,date:grp[0].StartDate,confirmedBy:SESSION.username}, function(){});
+  if(API_URL) apiCall({action:'saveConsolidation',groupId:groupId,jobIds:grp.map(function(j){return j.JobID;}),deliveryLocation:grp[0].DeliveryLocation,date:grp[0].StartDate,confirmedBy:SESSION.username}, function(){});
   toast('Consolidated ' + grp.length + ' jobs \u2014 same truck assigned');
   renderAll();
 }
@@ -2266,13 +2331,57 @@ function renderLocationsPage() {
   });
 }
 
-document.getElementById('btn-add-loc').addEventListener('click', function(){
+// Extract latitude/longitude from a Google Maps URL, trying several known patterns
+function extractLatLngFromUrl(url) {
+  if(!url) return null;
+  var m;
+  // /@lat,lng,zoom  (most common — appears when viewing any map or place)
+  m = url.match(/@(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if(m) return {lat: parseFloat(m[1]), lng: parseFloat(m[2])};
+  // !3dlat!4dlng (place detail permalinks)
+  m = url.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+  if(m) return {lat: parseFloat(m[1]), lng: parseFloat(m[2])};
+  // ?q=lat,lng or &q=lat,lng
+  m = url.match(/[?&]q=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if(m) return {lat: parseFloat(m[1]), lng: parseFloat(m[2])};
+  // ?ll=lat,lng or &ll=lat,lng
+  m = url.match(/[?&]ll=(-?\d{1,3}\.\d+),(-?\d{1,3}\.\d+)/);
+  if(m) return {lat: parseFloat(m[1]), lng: parseFloat(m[2])};
+  return null;
+}
+
+document.getElementById('loc-url').addEventListener('input', function() {
+  var statusEl = document.getElementById('loc-coords-status');
+  var url = this.value.trim();
+  if(!url) { statusEl.textContent = ''; return; }
+  var coords = extractLatLngFromUrl(url);
+  if(coords) {
+    document.getElementById('loc-lat').value = coords.lat;
+    document.getElementById('loc-lng').value = coords.lng;
+    statusEl.innerHTML = '<span style="color:var(--green)">\u2713 Coordinates extracted automatically</span>';
+  } else if(/goo\.gl|maps\.app/.test(url)) {
+    statusEl.innerHTML = '<span style="color:var(--amber)">This looks like a shortened link — open it in a browser tab and paste the full expanded URL here, or fill coordinates in manually below.</span>';
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--gray)">Could not detect coordinates in this link — fill them in manually if known.</span>';
+  }
+});
+
+function openAddLocationModal(targetField) {
+  LOC_MODAL_TARGET_FIELD = targetField || null;
   document.getElementById('loc-modal-title').textContent = 'Add Location';
   document.getElementById('loc-name').value = '';
   document.getElementById('loc-address').value = '';
   document.getElementById('loc-url').value = '';
+  document.getElementById('loc-lat').value = '';
+  document.getElementById('loc-lng').value = '';
+  document.getElementById('loc-coords-status').textContent = '';
   openModal('modal-loc');
-});
+}
+
+document.getElementById('btn-add-loc').addEventListener('click', function(){ openAddLocationModal(null); });
+document.getElementById('btn-add-loc-pickup').addEventListener('click', function(){ openAddLocationModal('j-pickup-manual'); });
+document.getElementById('btn-add-loc-delivery').addEventListener('click', function(){ openAddLocationModal('delivery-points'); });
+document.getElementById('btn-add-loc-return').addEventListener('click', function(){ openAddLocationModal('j-return-point'); });
 document.getElementById('btn-close-pdf-viewer').addEventListener('click', function(){
   document.getElementById('pdf-viewer-frame').src = '';
   closeModal('modal-pdf-viewer');
@@ -2283,10 +2392,24 @@ document.getElementById('btn-save-loc').addEventListener('click', function(){
   var name = document.getElementById('loc-name').value.trim();
   var url = document.getElementById('loc-url').value.trim();
   var address = document.getElementById('loc-address').value.trim();
+  var lat = parseFloat(document.getElementById('loc-lat').value);
+  var lng = parseFloat(document.getElementById('loc-lng').value);
   if(!name || !url) { toast('Name and Google Maps link are required'); return; }
-  LOCATIONS.push({name:name, url:url, address:address});
+  var newLoc = {name:name, url:url, address:address};
+  if(!isNaN(lat) && !isNaN(lng)) { newLoc.lat = lat; newLoc.lng = lng; }
+  LOCATIONS.push(newLoc);
   saveLocs(); closeModal('modal-loc'); renderLocationsPage();
-  toast('Location saved: ' + name);
+  populateSavedLocationsList();
+  toast('Location saved: ' + name + (newLoc.lat ? ' (coordinates stored)' : ' (no coordinates — consolidation matching may be less accurate)'));
+  // If this modal was opened from a job-form field, fill that field with the new location
+  if(LOC_MODAL_TARGET_FIELD === 'delivery-points') {
+    addDeliveryPointWithVal(name);
+    LOC_MODAL_TARGET_FIELD = null;
+  } else if(LOC_MODAL_TARGET_FIELD) {
+    sv(LOC_MODAL_TARGET_FIELD, name);
+    document.getElementById(LOC_MODAL_TARGET_FIELD).dispatchEvent(new Event('input'));
+    LOC_MODAL_TARGET_FIELD = null;
+  }
 });
 
 document.getElementById('jobs-filter').addEventListener('change', renderJobsTable);
