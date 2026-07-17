@@ -562,7 +562,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-geocoded-consolidation-1';
+var APP_VERSION = '2026-07-16-consol-reasons-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -1106,6 +1106,15 @@ function renderDashboard() {
 }
 
 var CURRENT_DAY_DATE = null;
+function consolidatedNoteHtml(j) {
+  if(!j.ConsolidationGroup) return '';
+  var siblings = JOBS.filter(function(x){ return x.ConsolidationGroup===j.ConsolidationGroup && x.JobID!==j.JobID; });
+  var siblingIds = siblings.map(function(x){ return x.JobID; }).join(', ');
+  return '<div style="margin-top:4px;font-size:11px;color:var(--purple);display:flex;align-items:center;gap:4px">' +
+    '&#x1F517; Consolidated' + (siblingIds ? ' with ' + siblingIds : '') +
+    '</div>';
+}
+
 function openDayModal(dateStr) {
   CURRENT_DAY_DATE = dateStr;
   var dayJobs = JOBS.filter(function(j){return j.StartDate===dateStr;});
@@ -1137,6 +1146,7 @@ function openDayModal(dateStr) {
             '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">' +
             j.UploadedFiles.map(function(f,fi){ return '<button class="btn btn-sm" style="font-size:11px;padding:2px 7px" data-jid="'+j.JobID+'" data-fi="'+fi+'" data-act="viewfile">&#x1F4CE; '+f.fileName+'</button>'; }).join('') +
             '</div>' : '') +
+          consolidatedNoteHtml(j) +
         '</div>' +
         '<div style="min-width:60px;font-size:12px;color:var(--gray)">' + j.StartTime + '</div>' +
         '<div>' + badge(j.Status) + '</div>' +
@@ -1211,7 +1221,7 @@ function renderJobsTable() {
       html += '<tr data-jid="' + j.JobID + '">' +
         '<td class="td-id">' + j.JobID + '</td>' +
         '<td class="td-m">' + (j.RefNo||'—') + '</td>' +
-        '<td>' + j.Customer + tsStr + '</td>' +
+        '<td>' + j.Customer + tsStr + consolidatedNoteHtml(j) + '</td>' +
         '<td>' + (j.PickupLocationUrl ? '<a href="'+j.PickupLocationUrl+'" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:none">Map: '+j.PickupLocation+'</a>' : '<span class="td-m">'+(j.PickupLocation||'—')+'</span>') + '</td>' +
         '<td class="td-m">' + (j.DeliveryLocation||'—') + '</td>' +
         '<td class="td-m">' + j.StartDate + ' ' + j.StartTime + '</td>' +
@@ -1488,21 +1498,33 @@ function getLocationCoords(deliveryLocationName) {
   return null;
 }
 
-// Are two jobs' delivery points close enough to consolidate?
-function deliveryZoneMatch(a, b) {
+// Are two jobs' delivery points close enough to consolidate? Returns {match, reason}
+function deliveryZoneMatchDetailed(a, b) {
   if(RULES.match === 'text') {
-    // No coordinates available — fall back to exact text match
-    return (a.DeliveryLocation||'').toLowerCase().trim() === (b.DeliveryLocation||'').toLowerCase().trim() && !!a.DeliveryLocation;
+    var sameTxt = (a.DeliveryLocation||'').toLowerCase().trim() === (b.DeliveryLocation||'').toLowerCase().trim() && !!a.DeliveryLocation;
+    return {match: sameTxt, reason: sameTxt ? 'Same delivery location' : ''};
   }
   var coordsA = getLocationCoords(a.DeliveryLocation);
   var coordsB = getLocationCoords(b.DeliveryLocation);
   if(coordsA && coordsB) {
     var dist = haversineKm(coordsA.lat, coordsA.lng, coordsB.lat, coordsB.lng);
-    return dist <= (parseFloat(RULES.match) || 15);
+    var thresholdKm = parseFloat(RULES.match) || 15;
+    var match = dist <= thresholdKm;
+    return {match: match, reason: match ? ('Delivery points ' + dist.toFixed(1) + ' km apart') : ''};
   }
-  // Missing coordinates for one or both — fall back to exact text match so we
-  // don't silently miss matches just because a location wasn't geocoded yet
-  return (a.DeliveryLocation||'').toLowerCase().trim() === (b.DeliveryLocation||'').toLowerCase().trim() && !!a.DeliveryLocation;
+  var sameTxt2 = (a.DeliveryLocation||'').toLowerCase().trim() === (b.DeliveryLocation||'').toLowerCase().trim() && !!a.DeliveryLocation;
+  return {match: sameTxt2, reason: sameTxt2 ? 'Same delivery location (address match)' : ''};
+}
+
+// Human-readable reason for pickup-time proximity between two jobs
+function timeProximityReason(a, b) {
+  var pa=(a.StartTime||'00:00').split(':'), pb=(b.StartTime||'00:00').split(':');
+  var ma=parseInt(pa[0])*60+parseInt(pa[1]), mb=parseInt(pb[0])*60+parseInt(pb[1]);
+  var diff=Math.abs(ma-mb);
+  if(diff<=15) return 'Pickup times almost identical (within 15 min)';
+  if(diff<=60) return 'Pickup times within 1 hour';
+  if(diff<=120) return 'Pickup times within 2 hours';
+  return '';
 }
 
 function scoreConsolidation(group) {
@@ -1524,19 +1546,25 @@ function getConsolidationGroups() {
   for(var i=0; i<candidates.length; i++) {
     if(used[candidates[i].JobID]) continue;
     var grp = [candidates[i]];
+    var reasonSet = {};
     for(var k=i+1; k<candidates.length; k++) {
       if(used[candidates[k].JobID]) continue;
       var a=candidates[i], b=candidates[k];
-      var zm = deliveryZoneMatch(a, b);
+      var zoneResult = deliveryZoneMatchDetailed(a, b);
       var dm = true;
       if(RULES.sameDate==='same') dm = a.StartDate===b.StartDate;
       else if(RULES.sameDate==='2days') dm = Math.abs(new Date(a.StartDate)-new Date(b.StartDate)) <= 2*86400000;
-      if(zm&&dm) { grp.push(candidates[k]); used[candidates[k].JobID]=1; }
+      if(zoneResult.match&&dm) {
+        grp.push(candidates[k]); used[candidates[k].JobID]=1;
+        if(zoneResult.reason) reasonSet[zoneResult.reason]=1;
+        var tReason = timeProximityReason(a,b);
+        if(tReason) reasonSet[tReason]=1;
+      }
     }
     if(grp.length>1) {
       grp.forEach(function(j){used[j.JobID]=1;});
       var sc = scoreConsolidation(grp);
-      if(sc>=thresh) groups.push({jobs:grp, score:sc});
+      if(sc>=thresh) groups.push({jobs:grp, score:sc, reasons:Object.keys(reasonSet)});
     }
   }
   return groups.sort(function(a,b){return b.score-a.score;});
@@ -1552,11 +1580,8 @@ function renderConsolidation() {
     return;
   }
   var totalJobs = groups.reduce(function(s,g){return s+g.jobs.length;},0);
-  var saving = groups.length * 1800;
   insightDiv.innerHTML = '<div class="insight-box"><div class="insight-title">\u2728 AI Analysis</div><ul class="insight-list">' +
     '<li>' + groups.length + ' group' + (groups.length>1?'s':'') + ' identified across ' + totalJobs + ' jobs</li>' +
-    '<li>Estimated saving: \u0e3f' + saving.toLocaleString() + ' (avg \u0e3f1,800 per run)</li>' +
-    '<li>Top group \u2014 ' + (groups[0].jobs[0].DeliveryLocation||'destination') + ' \u2014 confidence ' + groups[0].score + '%</li>' +
     '</ul></div>';
   var html = '';
   for(var gi=0; gi<groups.length; gi++) {
@@ -1566,6 +1591,8 @@ function renderConsolidation() {
     var times = g.jobs.map(function(j){return j.StartTime;}).join(', ');
     var sc = g.score;
     var scColor = sc>=90?'#22c55e':sc>=75?'#3b82f6':'#ea7c1e';
+    var reasonsHtml = (g.reasons && g.reasons.length) ?
+      '<div style="font-size:12px;color:rgba(255,255,255,.75);margin-bottom:8px">Why: ' + g.reasons.join(' \u00b7 ') + '</div>' : '';
     var cards = '';
     for(var ji=0; ji<g.jobs.length; ji++) {
       var j = g.jobs[ji];
@@ -1575,12 +1602,12 @@ function renderConsolidation() {
       '<div class="ai-bh"><svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>' +
       g.jobs.length + ' jobs \u00b7 ' + dest + ' \u00b7 ' + g.jobs[0].StartDate +
       '<span style="margin-left:auto;background:' + scColor + ';padding:3px 10px;border-radius:20px;font-size:12px">Score: ' + sc + '%</span></div>' +
-      '<div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:10px">Times: ' + times + ' \u00b7 ' + totalKgs + ' kgs total</div>' +
+      '<div style="font-size:12px;color:rgba(255,255,255,.65);margin-bottom:6px">Times: ' + times + ' \u00b7 ' + totalKgs + ' kgs total</div>' +
+      reasonsHtml +
       '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">' + cards + '</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
         '<button class="btn btn-primary btn-sm" data-gi="' + gi + '" data-act="confirm">\u2713 Confirm \u2014 same truck</button>' +
         '<button class="btn btn-sm" style="background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff" data-gi="' + gi + '" data-act="dismiss">Dismiss</button>' +
-        '<span style="font-size:12px;color:rgba(255,255,255,.5)">Est. saving: \u0e3f1,800</span>' +
       '</div>' +
     '</div>';
   }
