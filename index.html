@@ -376,7 +376,7 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
           <div style="background:var(--blue-l);border-left:3px solid var(--blue);padding:6px 10px;margin-bottom:10px;border-radius:0 var(--r) var(--r) 0;font-size:12px;font-weight:600;color:var(--blue)">Fill by CS Team</div>
           <div class="mj-field"><div class="mj-fl">MSI Job No.:</div><div class="mj-fc"><input type="text" id="j-ref"></div></div>
           <div class="mj-field"><div class="mj-fl">Short Description:</div><div class="mj-fc"><input type="text" id="j-desc"></div></div>
-          <div class="mj-field"><div class="mj-fl">Customer:</div><div class="mj-fc"><input type="text" id="j-customer" list="customer-list"><datalist id="customer-list"></datalist></div></div>
+          <div class="mj-field"><div class="mj-fl">Customer:</div><div class="mj-fc"><div style="display:flex;gap:6px"><input type="text" id="j-customer" list="customer-list" style="flex:1"><button type="button" class="mj-btn-sm" id="btn-add-customer" title="Add a new customer">+</button></div><datalist id="customer-list"></datalist></div></div>
           <div class="mj-field"><div class="mj-fl">Cargo Type:</div><div class="mj-fc"><select id="j-cargo-type-left"></select></div></div>
           <div class="mj-field"><div class="mj-fl">Start Date:</div><div class="mj-fc"><div class="mj-fc-row"><input type="date" id="j-start-date" style="flex:1"><input type="time" id="j-start-time" style="width:90px"></div></div></div>
           <div class="mj-field"><div class="mj-fl">End Date:</div><div class="mj-fc"><div class="mj-fc-row"><input type="date" id="j-end-date" style="flex:1"><input type="time" id="j-end-time" style="width:90px"></div></div></div>
@@ -562,7 +562,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-consol-reasons-1';
+var APP_VERSION = '2026-07-16-add-customer-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -1265,6 +1265,11 @@ function populateDDSelect(id, key, blank) {
   el.innerHTML = html;
 }
 
+function populateCustomerList() {
+  var custDL = document.getElementById('customer-list');
+  if(custDL) { var ch=''; (DROPDOWNS['Customer']||[]).forEach(function(c){ch+='<option value="'+c+'">';}); custDL.innerHTML=ch; }
+}
+
 function populateSavedLocationsList() {
   var locDL = document.getElementById('saved-locations-list');
   if(locDL) {
@@ -1287,8 +1292,7 @@ function openJobModal(jobId, presetDate) {
   // Job Type now handled per-truck row via populateTruckTypeSelects()
   populateDDSelect('j-cargo-type-left','Cargo Type',null);
   populateTruckTypeSelects();
-  var custDL = document.getElementById('customer-list');
-  if(custDL) { var ch=''; (DROPDOWNS['Customer']||[]).forEach(function(c){ch+='<option value="'+c+'">';}); custDL.innerHTML=ch; }
+  populateCustomerList();
   populateSavedLocationsList();
   var today = presetDate || bkDateStr();
   if(!jobId) {
@@ -1639,18 +1643,20 @@ function confirmConsolidation(idx) {
 // -- DROPDOWNS --
 function renderDropdowns() {
   var canEdit = SESSION && SESSION.role==='admin';
+  var canAddCustomer = SESSION && (SESSION.role==='admin' || SESSION.role==='cs' || SESSION.role==='transport');
   var html = '<div class="dd-grid">';
   var topics = Object.keys(DROPDOWNS);
   for(var ti=0; ti<topics.length; ti++) {
     var topic = topics[ti];
     var items = DROPDOWNS[topic];
+    var canAddThis = topic === 'Customer' ? canAddCustomer : canEdit;
     var itemsHtml = '';
     for(var ii=0; ii<items.length; ii++) {
       itemsHtml += '<div class="dd-item"><span>' + items[ii] + '</span>';
       if(canEdit) itemsHtml += '<div style="display:flex;gap:4px"><button class="btn btn-sm btn-icon" data-topic="' + topic + '" data-idx="' + ii + '" data-act="edit">✏</button><button class="btn btn-sm btn-icon" style="color:var(--red)" data-topic="' + topic + '" data-idx="' + ii + '" data-act="del">×</button></div>';
       itemsHtml += '</div>';
     }
-    var addRow = canEdit ? '<div class="dd-add-row"><input type="text" id="dd-inp-' + ti + '" placeholder="Add new..."><button class="btn btn-sm btn-primary" data-topic="' + topic + '" data-ti="' + ti + '" data-act="add">Add</button></div>' : '';
+    var addRow = canAddThis ? '<div class="dd-add-row"><input type="text" id="dd-inp-' + ti + '" placeholder="Add new..."><button class="btn btn-sm btn-primary" data-topic="' + topic + '" data-ti="' + ti + '" data-act="add">Add</button></div>' : '';
     html += '<div class="dd-card"><div class="dd-card-hdr"><span class="dd-card-title">' + topic + '</span><span style="font-size:11px;color:var(--gray)">' + items.length + ' items</span></div>' + itemsHtml + addRow + '</div>';
   }
   html += '</div>';
@@ -2404,6 +2410,20 @@ function openAddLocationModal(targetField) {
   document.getElementById('loc-coords-status').textContent = '';
   openModal('modal-loc');
 }
+
+document.getElementById('btn-add-customer').addEventListener('click', function(){
+  var name = prompt('New customer name:');
+  if(!name || !name.trim()) return;
+  name = name.trim();
+  if(!DROPDOWNS['Customer']) DROPDOWNS['Customer'] = [];
+  if(DROPDOWNS['Customer'].indexOf(name) === -1) {
+    DROPDOWNS['Customer'].push(name);
+    saveDDs();
+  }
+  populateCustomerList();
+  sv('j-customer', name);
+  toast('Customer added: ' + name);
+});
 
 document.getElementById('btn-add-loc').addEventListener('click', function(){ openAddLocationModal(null); });
 document.getElementById('btn-add-loc-pickup').addEventListener('click', function(){ openAddLocationModal('j-pickup-manual'); });
