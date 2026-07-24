@@ -203,6 +203,10 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
       <div class="nav-item" id="nav-consolidate" data-page="consolidate" style="display:none">
         <svg viewBox="0 0 24 24"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span>Consolidation</span>
       </div>
+      <div class="nav-item" id="nav-notifications" data-page="notifications" style="display:none">
+        <svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg><span>Notifications</span>
+        <span id="notif-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px"></span>
+      </div>
       <div class="s-sec">Config</div>
       <div class="nav-item" id="nav-locations" data-page="locations">
         <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg><span>Locations</span>
@@ -284,6 +288,14 @@ tbody tr:hover td{background:#f9fafb;cursor:pointer}
         </div>
         <div id="ai-insights"></div>
         <div id="consolidate-content"></div>
+      </div>
+
+      <div class="page" id="page-notifications">
+        <div class="page-hdr">
+          <div><div class="page-title">Notifications</div><div class="page-sub">Orders created or edited by CS Team</div></div>
+          <button class="btn btn-sm" id="btn-refresh-notif">Refresh</button>
+        </div>
+        <div id="notif-list"></div>
       </div>
 
       <div class="page" id="page-locations">
@@ -562,7 +574,7 @@ var API_URL = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
 // never the device's local timezone or raw UTC — otherwise dates/times drift  ──
 // depending on what timezone the viewing device happens to be set to.        ──
 var TZ = 'Asia/Bangkok';
-var APP_VERSION = '2026-07-16-add-customer-1';
+var APP_VERSION = '2026-07-16-cs-notifications-1';
 console.log('[TMS] App version:', APP_VERSION);
 
 // Returns YYYY-MM-DD for a given Date, expressed in Bangkok time
@@ -671,6 +683,7 @@ function applyRole() {
   document.getElementById('btn-new-job').style.display = (r==='cs'||r==='admin') ? '' : 'none';
   document.getElementById('nav-jobs').style.display = (r==='cs') ? 'none' : 'flex';
   document.getElementById('nav-consolidate').style.display = (r==='transport'||r==='admin') ? 'flex' : 'none';
+  document.getElementById('nav-notifications').style.display = (r==='transport'||r==='admin') ? 'flex' : 'none';
   document.getElementById('nav-myjobs').style.display = (r==='cs'||r==='admin') ? 'flex' : 'none';
   var savedUrl = localStorage.getItem('tms_api_url') || DEFAULT_API_URL;
   if(savedUrl) sv('api-url-inp', savedUrl);
@@ -977,6 +990,13 @@ function silentRefresh() {
       setApiStatus(false);
     }
   });
+  // Keep the Notifications badge current for Transport/Admin
+  if(SESSION.role==='transport' || SESSION.role==='admin') {
+    fetchLog(function(){
+      var notifPage = document.getElementById('page-notifications');
+      if(notifPage && notifPage.classList.contains('active')) renderNotifications();
+    });
+  }
 }
 
 // Poll for updates every 15 seconds so all devices stay in sync
@@ -1709,6 +1729,8 @@ function doLogin() {
     if(SESSION.role === 'cs') { goto('myjobs'); }
     try{ loadAll(); } catch(e){ console.error('loadAll:', e); }
     startAutoSync();
+    // Fetch activity log for the Notifications badge (Transport/Admin only)
+    if(role==='transport' || role==='admin') fetchLog();
     // Enrich USERS with the full list from the server (background, non-blocking)
     // so email-notification lookups work for every user, not just the 4 defaults
     if(API_URL) {
@@ -1716,6 +1738,7 @@ function doLogin() {
         if(res && res.ok && Array.isArray(res.users) && res.users.length > 0) {
           USERS = res.users;
           saveUsers();
+          updateNotifBadge(); // re-filter now that we have full role info
         }
       });
     }
@@ -1886,6 +1909,86 @@ function uploadTemplate(input) {
 }
 
 // -- NAV --
+// -- NOTIFICATIONS (CS activity feed for Transport/Admin) --
+var LOG_ENTRIES = [];
+
+function fetchLog(cb) {
+  if(!API_URL) { cb && cb(); return; }
+  apiCall({action:'getLog', limit:200}, function(res) {
+    if(res && res.ok && Array.isArray(res.entries)) {
+      LOG_ENTRIES = res.entries;
+      updateNotifBadge();
+    }
+    cb && cb();
+  });
+}
+
+// Only entries created by a user whose role is CS, and only job create/update actions
+function getCSLogEntries() {
+  var csUsernames = USERS.filter(function(u){ return u.role==='cs'; }).map(function(u){ return u.username; });
+  return LOG_ENTRIES.filter(function(e){
+    if(csUsernames.indexOf(e.user) < 0) return false;
+    return /^(Created job|Updated job)/.test(e.action||'');
+  });
+}
+
+function notifSeenKey() {
+  return 'tms_notif_seen_' + (SESSION ? SESSION.username : 'anon');
+}
+
+function updateNotifBadge() {
+  var badge = document.getElementById('notif-badge');
+  if(!badge || !SESSION) return;
+  var lastSeen = localStorage.getItem(notifSeenKey());
+  var csEntries = getCSLogEntries();
+  var unseenCount = lastSeen ? csEntries.filter(function(e){ return e.timestamp > lastSeen; }).length : csEntries.length;
+  if(unseenCount > 0) {
+    badge.textContent = unseenCount > 99 ? '99+' : String(unseenCount);
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function markNotificationsSeen() {
+  localStorage.setItem(notifSeenKey(), new Date().toISOString());
+  updateNotifBadge();
+}
+
+function renderNotifications() {
+  var listEl = document.getElementById('notif-list');
+  if(!listEl) return;
+  var entries = getCSLogEntries();
+  if(!entries.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--gray)">No CS activity yet.</div>';
+    return;
+  }
+  var html = '<div class="card"><div class="tw">';
+  entries.forEach(function(e) {
+    var jobIdMatch = (e.action||'').match(/Order\d+/);
+    var jobId = jobIdMatch ? jobIdMatch[0] : null;
+    var isCreate = /^Created job/.test(e.action);
+    html += '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)' + (jobId ? ';cursor:pointer' : '') + '"' +
+      (jobId ? ' data-jid="'+jobId+'" class="notif-row"' : '') + '>' +
+      '<div style="width:8px;height:8px;border-radius:50%;background:' + (isCreate?'var(--blue)':'var(--amber)') + ';flex-shrink:0"></div>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:13px;color:#111827">' + (e.action||'') + '</div>' +
+        '<div style="font-size:11px;color:var(--gray);margin-top:2px">' + (e.user||'') + ' \u00b7 ' + bkDateTimeStr(e.timestamp) + '</div>' +
+      '</div>' +
+      (jobId ? '<span style="font-size:11px;color:var(--blue)">View \u2192</span>' : '') +
+    '</div>';
+  });
+  html += '</div></div>';
+  listEl.innerHTML = html;
+  document.querySelectorAll('.notif-row').forEach(function(row) {
+    row.addEventListener('click', function() {
+      var jid = row.getAttribute('data-jid');
+      if(jid && JOBS.find(function(j){return j.JobID===jid;})) openJobModal(jid);
+      else toast('Job ' + jid + ' not found (may have been deleted)');
+    });
+  });
+}
+
 function goto(page) {
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
@@ -1897,6 +2000,7 @@ function goto(page) {
   if(page==='dashboard') renderDashboard();
   if(page==='locations') renderLocationsPage();
   if(page==='myjobs') renderMyJobs();
+  if(page==='notifications') { renderNotifications(); markNotificationsSeen(); }
 }
 
 // -- CONFIRM JOB (Transport team) --
@@ -2462,6 +2566,7 @@ document.getElementById('btn-save-loc').addEventListener('click', function(){
 document.getElementById('jobs-filter').addEventListener('change', renderJobsTable);
 document.getElementById('jobs-search').addEventListener('input', renderJobsTable);
 document.getElementById('btn-runai').addEventListener('click', function(){renderConsolidation();toast('AI analysis complete');});
+document.getElementById('btn-refresh-notif').addEventListener('click', function(){ fetchLog(function(){ renderNotifications(); toast('Notifications refreshed'); }); });
 function addDeliveryPointWithVal(preselectedName) {
   var dp = document.getElementById('delivery-points');
   var div = document.createElement('div');
